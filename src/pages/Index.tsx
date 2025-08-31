@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { MenuCard, MenuItem } from '@/components/MenuCard';
 import { ShoppingCart, CartItem } from '@/components/ShoppingCart';
 import { TableSelection } from '@/components/TableSelection';
@@ -6,6 +7,8 @@ import { CategoryFilter } from '@/components/CategoryFilter';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { LogOut, User } from 'lucide-react';
 import burgerImage from '@/assets/burger-hero.jpg';
 import caesarSaladImage from '@/assets/caesar-salad.jpg';
 import margheritaPizzaImage from '@/assets/margherita-pizza.jpg';
@@ -51,6 +54,8 @@ const Index = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const { toast } = useToast();
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const categories = Array.from(new Set(sampleMenuItems.map(item => item.category)));
   const filteredItems = selectedCategory === 'all' 
@@ -147,13 +152,41 @@ const Index = () => {
               </p>
             </div>
             
-            <Button
-              variant="outline"
-              onClick={() => setShowTableSelection(true)}
-              className="text-sm"
-            >
-              Change Order Type
-            </Button>
+            <div className="flex items-center gap-2">
+              {!loading && (
+                <>
+                  {user ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <User className="w-4 h-4" />
+                        {user.email}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => signOut()}
+                      >
+                        <LogOut className="w-4 h-4 mr-1" />
+                        Sign Out
+                      </Button>
+                    </div>
+                  ) : (
+                    <Link to="/auth">
+                      <Button variant="outline" size="sm">
+                        Sign In
+                      </Button>
+                    </Link>
+                  )}
+                </>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => setShowTableSelection(true)}
+                className="text-sm"
+              >
+                Change Order Type
+              </Button>
+            </div>
           </div>
         </div>
       </header>
