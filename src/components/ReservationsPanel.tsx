@@ -106,16 +106,18 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
 
   if (!reservations.length) {
     return (
-      <div className="text-sm text-muted-foreground py-4">No reservations yet.</div>
+      <div className="text-sm sm:text-base text-muted-foreground py-4 text-center px-2">No reservations yet.</div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 pb-1">
-        <Button size="sm" variant={filter==='all'?'default':'outline'} onClick={() => setFilter('all')}>All</Button>
-        <Button size="sm" variant={filter==='active'?'default':'outline'} onClick={() => setFilter('active')}>Active</Button>
-        <Button size="sm" variant={filter==='completed'?'default':'outline'} onClick={() => setFilter('completed')}>Completed</Button>
+    <div className="space-y-3 max-h-[70vh] overflow-y-auto px-1 sm:px-0">
+      <div className="flex items-center gap-2 pb-1 overflow-x-auto">
+        <div className="flex items-center gap-2 whitespace-nowrap">
+          <Button size="sm" variant={filter==='all'?'default':'outline'} onClick={() => setFilter('all')}>All</Button>
+          <Button size="sm" variant={filter==='active'?'default':'outline'} onClick={() => setFilter('active')}>Active</Button>
+          <Button size="sm" variant={filter==='completed'?'default':'outline'} onClick={() => setFilter('completed')}>Completed</Button>
+        </div>
       </div>
       {filtered.map((r) => {
   const n = parseNotes(r.notes);
@@ -123,10 +125,10 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
         return (
           <Card key={r.id} className="border">
             <CardHeader className="py-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Reservation #{r.id.slice(0,8)}</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-sm sm:text-base break-words">Reservation #{r.id.slice(0,8)}</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Badge variant={statusVariant(r.status)} className="capitalize">{r.status}</Badge>
+                  <Badge variant={statusVariant(r.status)} className="capitalize text-xs sm:text-sm">{r.status}</Badge>
                   {(r.status === 'pending' || r.status === 'confirmed') && (
                     <Button
                       size="sm"
@@ -164,30 +166,30 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <div className="grid grid-cols-2 gap-2">
+            <CardContent className="text-xs sm:text-sm space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <div className="text-muted-foreground">When</div>
                   <div>{new Date(r.reserved_at).toLocaleString()}</div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Table</div>
-                  <div>{String(label)}</div>
+                  <div className="break-words">{String(label)}</div>
                 </div>
               </div>
               <Separator />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <div className="text-muted-foreground">Order type</div>
-                  <div>{String(n?.orderType ?? '—')}</div>
+                  <div className="break-words">{String(n?.orderType ?? '—')}</div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Contact</div>
-                  <div>{String(n?.contact_phone ?? '—')}</div>
+                  <div className="break-words">{String(n?.contact_phone ?? '—')}</div>
                 </div>
               </div>
               {n?.total != null && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <div className="text-muted-foreground">Total</div>
                     <div>{Number(n.total).toFixed(2)} MAD</div>
@@ -196,11 +198,11 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
               )}
               {Array.isArray(n?.items) && n.items.length > 0 && (
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-sm">Show items</summary>
+                  <summary className="cursor-pointer text-xs sm:text-sm">Show items</summary>
                   <div className="mt-2 space-y-1">
                     {n.items.map((it, idx) => (
-                      <div className="flex justify-between text-xs" key={idx}>
-                        <span className="truncate mr-2">{String(it.name)}</span>
+                      <div className="flex justify-between text-[11px] sm:text-xs" key={idx}>
+                        <span className="truncate mr-2 break-words">{String(it.name)}</span>
                         <span className="text-muted-foreground">x{Number(it.qty)}</span>
                       </div>
                     ))}
