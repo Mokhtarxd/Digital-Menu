@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MapPin, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TableSelectionProps {
   onTableSelected: (tableNumber: string | null, orderType: 'dine-in' | 'takeout') => void;
@@ -15,22 +16,63 @@ export const TableSelection = ({ onTableSelected }: TableSelectionProps) => {
   const [orderType, setOrderType] = useState<'dine-in' | 'takeout'>('dine-in');
   const [tableNumber, setTableNumber] = useState('');
   const [detectedTable, setDetectedTable] = useState<string | null>(null);
+  const [autoSubmitted, setAutoSubmitted] = useState(false);
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [tableOptions, setTableOptions] = useState<{ label: string }[]>([]);
+  type TableRow = { label: string; is_available: boolean | null };
   const { toast } = useToast();
 
-  // Simulate QR code detection from URL
+  // QR code detection from URL path: supports /table/3 or /table/T3
   useEffect(() => {
     const path = window.location.pathname;
-    const tableMatch = path.match(/\/table\/(\d+)/);
+    const tableMatch = path.match(/\/table\/([A-Za-z0-9-]+)/i);
     if (tableMatch) {
-      const table = tableMatch[1];
-      setDetectedTable(table);
-      setTableNumber(table);
+      const raw = tableMatch[1];
+      const numericForMsg = raw.replace(/^T/i, '');
+      setDetectedTable(numericForMsg);
+      setTableNumber(raw);
       toast({
         title: "Table Detected",
-        description: `Welcome to Table ${table}!`,
+        description: `Welcome to Table ${numericForMsg}!`,
       });
     }
   }, [toast]);
+
+  // Load available table labels from Supabase
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoadingTables(true);
+      try {
+        const { data, error } = await supabase
+          .from('tables')
+          .select('label, is_available')
+          .order('label', { ascending: true });
+        if (!mounted) return;
+        if (error) {
+          return;
+        }
+        const opts = (data as TableRow[] | null || [])
+          .filter((t) => t.is_available !== false)
+          .map((t) => ({ label: String(t.label) }));
+        setTableOptions(opts);
+        // If QR detected, align the selection to an exact label and auto-continue
+        if (detectedTable) {
+          const match = opts.find(o => o.label === detectedTable || o.label === `T${detectedTable}`)?.label || tableNumber;
+          if (match) setTableNumber(match);
+          if (!autoSubmitted && match) {
+            setOrderType('dine-in');
+            onTableSelected(match, 'dine-in');
+            setAutoSubmitted(true);
+          }
+        }
+      } finally {
+        if (mounted) setLoadingTables(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [detectedTable, autoSubmitted, onTableSelected, tableNumber]);
 
   const handleConfirm = () => {
     if (orderType === 'dine-in' && !tableNumber) {
@@ -86,15 +128,23 @@ export const TableSelection = ({ onTableSelected }: TableSelectionProps) => {
 
           {orderType === 'dine-in' && (
             <div className="space-y-2">
-              <Label htmlFor="table">Table Number</Label>
-              <Input
-                id="table"
-                type="number"
-                placeholder="Enter your table number"
+              <Label>Table</Label>
+              <Select
                 value={tableNumber}
-                onChange={(e) => setTableNumber(e.target.value)}
-                className={detectedTable ? 'border-success' : ''}
-              />
+                onValueChange={(val) => setTableNumber(val)}
+                disabled={loadingTables}
+              >
+                <SelectTrigger className={detectedTable ? 'border-success' : ''}>
+                  <SelectValue placeholder={loadingTables ? 'Loading tables…' : 'Select your table'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {tableOptions.map((t) => (
+                    <SelectItem key={t.label} value={t.label}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {detectedTable && (
                 <p className="text-sm text-success flex items-center gap-1">
                   <MapPin className="h-3 w-3" />

@@ -41,15 +41,192 @@ export type Database = {
         }
         Relationships: []
       }
+      tables: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          location: string | null
+          seats: number
+          is_available: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          location?: string | null
+          seats?: number
+          is_available?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          location?: string | null
+          seats?: number
+          is_available?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dishes: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          description: string | null
+          price: number
+          currency: string
+          category: string | null
+          is_available: boolean
+          image_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          description?: string | null
+          price?: number
+          currency?: string
+          category?: string | null
+          is_available?: boolean
+          image_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          description?: string | null
+          price?: number
+          currency?: string
+          category?: string | null
+          is_available?: boolean
+          image_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      reservations: {
+        Row: {
+          created_at: string
+          id: string
+          table_id: string | null
+          user_id: string | null
+          party_size: number
+          reserved_at: string
+          status: Database['public']['Enums']['reservation_status']
+          notes: string | null
+          updated_at: string
+          client_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          table_id?: string | null
+          user_id?: string | null
+          party_size?: number
+          reserved_at: string
+          status?: Database['public']['Enums']['reservation_status']
+          notes?: string | null
+          updated_at?: string
+          client_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          table_id?: string | null
+          user_id?: string | null
+          party_size?: number
+          reserved_at?: string
+          status?: Database['public']['Enums']['reservation_status']
+          notes?: string | null
+          updated_at?: string
+          client_id?: string | null
+        }
+        Relationships: []
+      }
+      loyalty_points: {
+        Row: {
+          user_id: string
+          points: number
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          points?: number
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          points?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'loyalty_points_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: true
+            referencedRelation: 'profiles'
+            referencedColumns: ['user_id']
+          }
+        ]
+      }
+      loyalty_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          delta: number
+          reason: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          delta: number
+          reason?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          delta?: number
+          reason?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'loyalty_transactions_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['user_id']
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      award_points: {
+        Args: {
+          p_user_id: string
+          amount: number
+          reason?: string | null
+          metadata?: Json | null
+        }
+        Returns: number
+      }
     }
     Enums: {
-      [_ in never]: never
+      reservation_status: 'pending' | 'confirmed' | 'cancelled' | 'seated' | 'completed'
     }
     CompositeTypes: {
       [_ in never]: never

@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ShoppingCart as CartIcon, Plus, Minus, X, CheckCircle } from 'lucide-react';
 import { MenuItem } from './MenuCard';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export interface CartItem extends MenuItem {
   quantity: number;
@@ -14,9 +16,12 @@ interface ShoppingCartProps {
   items: CartItem[];
   onUpdateQuantity: (itemId: string, newQuantity: number) => void;
   onRemoveItem: (itemId: string) => void;
-  onCheckout: () => void;
+  onCheckout: (contactPhone?: string) => void;
   isOpen: boolean;
   onToggle: () => void;
+  isLoggedIn?: boolean;
+  extraFields?: React.ReactNode;
+  canProceed?: boolean;
 }
 
 export const ShoppingCart = ({ 
@@ -25,10 +30,17 @@ export const ShoppingCart = ({
   onRemoveItem, 
   onCheckout,
   isOpen,
-  onToggle 
+  onToggle,
+  isLoggedIn = false,
+  extraFields,
+  canProceed = true,
 }: ShoppingCartProps) => {
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const [phone, setPhone] = useState('');
+  const [touched, setTouched] = useState(false);
+  const digitsCount = useMemo(() => (phone.replace(/\D/g, '').length), [phone]);
+  const phoneValid = useMemo(() => digitsCount >= 8 && digitsCount <= 15, [digitsCount]);
 
   if (!isOpen) {
     return (
@@ -137,6 +149,27 @@ export const ShoppingCart = ({
                       {totalPrice.toFixed(2)} MAD
                     </span>
                   </div>
+                  {extraFields && (
+                    <div className="mt-4 space-y-2">
+                      {extraFields}
+                    </div>
+                  )}
+                  {!isLoggedIn && items.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <Label htmlFor="contact-phone">Phone number (required)</Label>
+                      <Input
+                        id="contact-phone"
+                        type="tel"
+                        placeholder="e.g., +212 6 12 34 56 78"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        onBlur={() => setTouched(true)}
+                      />
+                      {touched && !phoneValid && (
+                        <p className="text-xs text-destructive">Please enter a valid phone number (8–15 digits).</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -145,9 +178,10 @@ export const ShoppingCart = ({
           {items.length > 0 && (
             <div className="p-4 border-t">
               <Button 
-                onClick={onCheckout}
+                onClick={() => onCheckout(isLoggedIn ? undefined : phone.trim())}
                 className="w-full bg-gradient-primary hover:opacity-90 transition-smooth"
                 size="lg"
+                disabled={(!isLoggedIn && !phoneValid) || !canProceed}
               >
                 <CheckCircle className="mr-2 h-5 w-5" />
                 Proceed to Checkout

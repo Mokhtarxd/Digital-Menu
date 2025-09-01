@@ -8,10 +8,35 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+function getOrCreateClientId(): string {
+  const key = 'x-client-id';
+  const existing = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+  if (existing) return existing;
+  // Simple UUID v4 generator (fallback) to avoid new deps
+  const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+  try { localStorage.setItem(key, uuid); } catch (e) {
+    // ignore write errors (private mode or disabled storage)
+  }
+  return uuid;
+}
+
+const X_CLIENT_ID = getOrCreateClientId();
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    headers: {
+      'X-Client-Id': X_CLIENT_ID,
+    },
+  },
 });
+
+export const CLIENT_ID = X_CLIENT_ID;
