@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
+import { useToast } from '../hooks/use-toast';
 
 type Reservation = Database['public']['Tables']['reservations']['Row'];
 type TableRow = Database['public']['Tables']['tables']['Row'];
@@ -39,6 +40,7 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
   const [tables, setTables] = useState<TableRow[]>([]);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { toast } = useToast();
   const tableLabel = useMemo(() => {
     const map = new Map<string, string>();
     tables.forEach(t => map.set(t.id, t.label));
@@ -133,17 +135,26 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
                       onClick={async () => {
                         try {
                           setBusyId(r.id);
-                          const { error } = await supabase
+                          const { data: updated, error } = await supabase
                             .from('reservations')
                             .update({ status: 'cancelled' })
                             .eq('id', r.id)
                             .select('id')
-                            .single();
+                            .maybeSingle();
                           if (error) throw error;
-                          setReservations(prev => prev.map(x => x.id === r.id ? { ...x, status: 'cancelled' } as Reservation : x));
+                          if (!updated) {
+                            toast({
+                              title: 'Cancel not applied',
+                              description: 'Reservation not found or not permitted.',
+                              variant: 'destructive'
+                            });
+                          } else {
+                            setReservations(prev => prev.map(x => x.id === r.id ? { ...x, status: 'cancelled' } as Reservation : x));
+                          }
                         } catch (e) {
                           // ignored; RLS may block
                           console.error('Cancel failed', e);
+                          toast({ title: 'Cancel failed', description: 'You may not have permission to cancel this reservation.', variant: 'destructive' });
                         } finally {
                           setBusyId(null);
                         }
