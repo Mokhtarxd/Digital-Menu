@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useLoyaltyPoints } from '@/hooks/useLoyaltyPoints';
-import { LogOut, User, Instagram, ExternalLink } from 'lucide-react';
+import { LogOut, User, Instagram, ExternalLink, Shield } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import QRCode from 'qrcode';
 import { ReservationsPanel } from '@/components/ReservationsPanel';
@@ -338,19 +338,101 @@ const Index = () => {
       </Dialog>
       {/* Header */}
       <header className="bg-card/90 backdrop-blur-sm border-b sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          {/* Mobile Layout */}
+          <div className="flex flex-col gap-2 sm:hidden">
+            {/* Top Row: Logo + Title and Sign Out */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <img 
+                  src="/dar-lmeknessia.png" 
+                  alt="Dar Lmeknessiya" 
+                  className="w-8 h-8 rounded-full object-cover border-2 border-primary/20"
+                />
+                <div>
+                  <h1 className="text-base font-bold text-black leading-tight">
+                    Dar Lmeknessiya
+                  </h1>
+                </div>
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => signOut()}
+                className="px-2 py-1 rounded-full border-2 hover:bg-accent hover:text-accent-foreground transition-all duration-300"
+                title="Sign Out"
+              >
+                <LogOut className="w-3 h-3" />
+              </Button>
+            </div>
+            
+            {/* Bottom Row: Social Links + User Info + Actions */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {/* Social Media Links */}
+                <a 
+                  href="https://www.instagram.com/dar_lmeknessia" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-1.5 hover:bg-muted rounded-md transition-colors"
+                  title="Follow us on Instagram"
+                >
+                  <Instagram className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                </a>
+                <a 
+                  href="https://www.tripadvisor.fr/Restaurant_Review-g479761-d23790414-Reviews-Teranga-Dakhla_Dakhla_Oued_Ed_Dahab.html" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-1.5 hover:bg-muted rounded-md transition-colors"
+                  title="View us on TripAdvisor"
+                >
+                  <ExternalLink className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                </a>
+                
+                {/* Loyalty Points Badge */}
+                {!loading && user && typeof loyaltyPoints === 'number' && (
+                  <Badge variant="secondary" className="text-xs px-2 py-0.5">{loyaltyPoints} pts</Badge>
+                )}
+              </div>
+              
+              {/* User Actions */}
+              {!loading && (
+                <>
+                  {user ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => setFollowOpen(true)}
+                      className="text-xs px-3 py-1 rounded-full border-2 hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-300"
+                      size="sm"
+                    >
+                      Orders
+                    </Button>
+                  ) : (
+                    <Link to="/auth">
+                      <Button variant="outline" size="sm" className="rounded-full px-3 py-1 border-2 hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-300 text-xs">
+                        Sign In
+                      </Button>
+                    </Link>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+          
+          {/* Desktop Layout */}
+          <div className="hidden sm:flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4">
               <img 
-                src="/placeholder.svg" 
-                alt="Dar Lmeknassia" 
+                src="/dar-lmeknessia.png" 
+                alt="Dar Lmeknessiya" 
                 className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-primary/20"
               />
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                  Dar Lmeknassia
+                <h1 className="text-lg sm:text-2xl font-bold text-black">
+                  Dar Lmeknessiya
                 </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   {tableInfo?.orderType === 'dine-in' && tableInfo?.tableNumber
                     ? `Table ${tableInfo.tableNumber} • Dine In`
                     : 'Takeout Order'
@@ -360,8 +442,8 @@ const Index = () => {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
-              {/* Social Media Links - Hidden on very small screens */}
-              <div className="hidden sm:flex items-center gap-2">
+              {/* Social Media Links */}
+              <div className="flex items-center gap-2">
                 <a 
                   href="https://www.instagram.com/dar_lmeknessia" 
                   target="_blank" 
@@ -386,24 +468,20 @@ const Index = () => {
                 <>
                   {user ? (
                     <div className="flex items-center gap-1 sm:gap-2">
-                      <div className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <User className="w-4 h-4" />
                         <span className="hidden md:inline">{user.email}</span>
                         {typeof loyaltyPoints === 'number' && (
                           <Badge variant="secondary" className="ml-2 text-xs">{loyaltyPoints} pts</Badge>
                         )}
                       </div>
-                      {typeof loyaltyPoints === 'number' && (
-                        <Badge variant="secondary" className="sm:hidden text-xs">{loyaltyPoints} pts</Badge>
-                      )}
                       <Button
                         variant="outline"
                         onClick={() => setFollowOpen(true)}
                         className="text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2 rounded-full border-2 hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-300"
                         size="sm"
                       >
-                        <span className="hidden sm:inline">Reservations</span>
-                        <span className="sm:hidden">Orders</span>
+                        Reservations
                       </Button>
                     </div>
                   ) : (
@@ -484,6 +562,21 @@ const Index = () => {
       isLoggedIn={!!user}
         canProceed={true}
       />
+
+      {/* Admin Login Button */}
+      <div className="fixed bottom-4 left-4 z-40">
+        <Link to="/admin/login">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="bg-background/90 backdrop-blur-sm border-2 hover:bg-accent hover:text-accent-foreground transition-all duration-300 rounded-full px-3 py-2"
+            title="Admin Login"
+          >
+            <Shield className="w-4 h-4" />
+            <span className="ml-1 text-xs hidden sm:inline">Admin</span>
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 };
