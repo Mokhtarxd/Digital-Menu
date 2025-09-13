@@ -13,13 +13,13 @@ interface TableSelectionProps {
 }
 
 export const TableSelection = ({ onTableSelected }: TableSelectionProps) => {
-  const [orderType, setOrderType] = useState<'dine-in' | 'takeout'>('dine-in');
+  const [orderType, setOrderType] = useState<'dine-in' | 'takeout'>('takeout');
   const [tableNumber, setTableNumber] = useState('');
   const [detectedTable, setDetectedTable] = useState<string | null>(null);
   const [autoSubmitted, setAutoSubmitted] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [tableOptions, setTableOptions] = useState<{ label: string }[]>([]);
-  type TableRow = { label: string; is_available: boolean | null };
+  type TableRow = { label: string; status: string };
   const { toast } = useToast();
 
   // QR code detection from URL path: supports /table/3 or /table/T3
@@ -44,17 +44,29 @@ export const TableSelection = ({ onTableSelected }: TableSelectionProps) => {
     const load = async () => {
       setLoadingTables(true);
       try {
+        console.log('Loading tables...');
         const { data, error } = await supabase
           .from('tables')
-          .select('label, is_available')
+          .select('label, status')
           .order('label', { ascending: true });
+        console.log('Tables query result:', { data, error });
         if (!mounted) return;
         if (error) {
+          console.error('Tables query error:', error);
           return;
         }
-        const opts = (data as TableRow[] | null || [])
-          .filter((t) => t.is_available !== false)
-          .map((t) => ({ label: String(t.label) }));
+        const opts = ((data || []) as any[])
+          .filter((t: any) => t.status === 'available' && t.label !== 'T20') // Exclude T20 (takeout table) and only show available
+          .map((t: any) => ({ label: String(t.label) }))
+          .sort((a, b) => {
+            // Extract numbers from labels like T1, T2, T10, etc.
+            const getNumber = (label: string) => {
+              const match = label.match(/\d+/);
+              return match ? parseInt(match[0]) : 0;
+            };
+            return getNumber(a.label) - getNumber(b.label);
+          });
+        console.log('Filtered table options:', opts);
         setTableOptions(opts);
         // If QR detected, align the selection to an exact label and auto-continue
         if (detectedTable) {

@@ -167,11 +167,7 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
               </div>
             </CardHeader>
             <CardContent className="text-xs sm:text-sm space-y-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <div className="text-muted-foreground">When</div>
-                  <div>{new Date(r.reserved_at).toLocaleString()}</div>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-1 gap-2">
                 <div>
                   <div className="text-muted-foreground">Table</div>
                   <div className="break-words">{String(label)}</div>

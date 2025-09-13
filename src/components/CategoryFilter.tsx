@@ -13,15 +13,15 @@ export const CategoryFilter = ({
   onCategoryChange 
 }: CategoryFilterProps) => {
   return (
-    <div className="bg-card border-b sticky top-0 z-40 px-4 py-3">
+    <div className="sticky top-0 z-40 px-3 sm:px-4 py-2 sm:py-3">
       <ScrollArea className="w-full whitespace-nowrap">
-        <div className="flex gap-2">
+        <div className="flex gap-2 sm:gap-3">
           <Button
-            variant={selectedCategory === 'all' ? 'default' : 'outline'}
+            variant="outline"
             onClick={() => onCategoryChange('all')}
             className={selectedCategory === 'all' 
-              ? 'bg-gradient-primary hover:opacity-90' 
-              : 'hover:bg-muted'
+              ? 'rounded-full px-4 sm:px-6 py-2 border-2 bg-background text-primary font-semibold text-xs sm:text-sm' 
+              : 'rounded-full px-4 sm:px-6 py-2 border-2 hover:bg-gray-100 hover:text-gray-700 font-medium transition-all duration-300 text-xs sm:text-sm'
             }
           >
             All Items
@@ -30,11 +30,11 @@ export const CategoryFilter = ({
           {categories.map((category) => (
             <Button
               key={category}
-              variant={selectedCategory === category ? 'default' : 'outline'}
+              variant="outline"
               onClick={() => onCategoryChange(category)}
               className={selectedCategory === category 
-                ? 'bg-gradient-primary hover:opacity-90' 
-                : 'hover:bg-muted'
+                ? 'rounded-full px-4 sm:px-6 py-2 border-2 bg-background text-primary font-semibold text-xs sm:text-sm' 
+                : 'rounded-full px-4 sm:px-6 py-2 border-2 hover:bg-gray-100 hover:text-gray-700 font-medium transition-all duration-300 text-xs sm:text-sm'
               }
             >
               {category}

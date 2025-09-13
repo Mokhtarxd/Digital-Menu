@@ -8,11 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { LogOut, User } from 'lucide-react';
+import { useLoyaltyPoints } from '@/hooks/useLoyaltyPoints';
+import { LogOut, User, Instagram, ExternalLink } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import QRCode from 'qrcode';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { ReservationsPanel } from '@/components/ReservationsPanel';
 // Images are provided by Supabase rows (image_url). Use a placeholder when missing.
 import { supabase, CLIENT_ID } from '@/integrations/supabase/client';
@@ -29,7 +28,11 @@ const Index = () => {
     const load = async () => {
       setLoadingMenu(true);
       try {
-        const { data, error } = await supabase.from('dishes').select('*').order('name', { ascending: true });
+        const { data, error } = await supabase
+          .from('dishes')
+          .select('*')
+          .eq('is_hidden', false)
+          .order('name', { ascending: true });
         if (!mounted) return;
         if (error) {
           setRemoteMenuItems([]);
@@ -43,6 +46,9 @@ const Index = () => {
           category: r.category || 'Uncategorized',
           image: r.image_url || '/placeholder.svg',
           available: Boolean(r.is_available),
+          is_hidden: Boolean(r.is_hidden),
+          loyalty_points: r.loyalty_points,
+          wait_time: r.wait_time,
         }));
         setRemoteMenuItems(mapped);
       } finally {
@@ -69,28 +75,14 @@ const Index = () => {
     partySize: number
     total: number
   } | null>(null);
-  const [loyaltyPoints, setLoyaltyPoints] = useState<number | null>(null);
-  const [reservationDate, setReservationDate] = useState<string>('');
-  const [reservationTime, setReservationTime] = useState<string>('');
   const [followOpen, setFollowOpen] = useState(false);
   const { toast } = useToast();
   const { user, loading, signOut } = useAuth();
+  const { points: loyaltyPoints, redeemPoints, awardPoints } = useLoyaltyPoints();
   const navigate = useNavigate();
 
   useEffect(() => {
-    let mounted = true;
-    const loadPoints = async () => {
-      if (!user) { setLoyaltyPoints(null); return; }
-      const { data } = await supabase
-        .from('loyalty_points')
-        .select('points')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (!mounted) return;
-      setLoyaltyPoints(data?.points ?? 0);
-    };
-    loadPoints();
-    return () => { mounted = false };
+    // useLoyaltyPoints hook handles loyalty points loading automatically
   }, [user]);
 
   const sourceItems = remoteMenuItems ?? [];
@@ -156,7 +148,7 @@ const Index = () => {
     });
   };
 
-  const handleCheckout = async (contactPhone?: string) => {
+  const handleCheckout = async (contactPhone?: string, loyaltyPointsUsed?: number) => {
     // Build reservation payload
     const partySize = cartItems.reduce((s, it) => s + it.quantity, 0) || 1;
 
@@ -180,23 +172,46 @@ const Index = () => {
     } catch { /* ignore */ }
 
     const totalAmount = cartItems.reduce((s, it) => s + it.price * it.quantity, 0);
-    // Determine reserved_at from selected date/time if provided
+    
+    // Calculate final amount after loyalty discount
+    const loyaltyDiscount = loyaltyPointsUsed ? loyaltyPointsUsed * 1 : 0; // 1 point = 1 MAD
+    const finalAmount = Math.max(0, totalAmount - loyaltyDiscount);
+    
+    // Determine reservation time - automatic timing only
     let reservedAtISO = new Date().toISOString();
-    if (reservationDate && reservationTime) {
-      const dt = new Date(`${reservationDate}T${reservationTime}:00`);
-      if (!Number.isNaN(dt.getTime())) reservedAtISO = dt.toISOString();
-    }
+    
+    // Automatic timing based on order type - both set to present hour
+    const reservationTime = new Date();
+    // Both dine-in and takeout orders are set for the present hour (no delay)
+    reservedAtISO = reservationTime.toISOString();
 
     const notes = JSON.stringify({
       orderType: tableInfo?.orderType ?? 'takeout',
       tableNumber: providedTable,
       items: cartItems.map(i => ({ id: i.id, name: i.name, qty: i.quantity })),
-      total: totalAmount,
+      subtotal: totalAmount,
+      loyaltyPointsUsed: loyaltyPointsUsed || 0,
+      loyaltyDiscount: loyaltyDiscount,
+      total: finalAmount,
       contact_phone: contactPhone ?? null,
-      requested_slot: reservationDate && reservationTime ? `${reservationDate} ${reservationTime}` : null,
+      requested_slot: null, // No longer using manual date/time selection
     });
 
     try {
+      // Redeem loyalty points if any were used
+      if (loyaltyPointsUsed && loyaltyPointsUsed > 0 && user) {
+        const newBalance = await redeemPoints(
+          loyaltyPointsUsed,
+          'Order payment',
+          {
+            order_items: cartItems.map(i => ({ id: i.id, name: i.name, qty: i.quantity })),
+            discount_amount: loyaltyDiscount,
+            original_total: totalAmount,
+            final_total: finalAmount,
+          }
+        );
+      }
+
       const payload: Database['public']['Tables']['reservations']['Insert'] = {
         table_id: resolvedTableId,
         user_id: (user?.id as unknown as string) ?? null,
@@ -208,62 +223,69 @@ const Index = () => {
 
   const { data: inserted, error } = await supabase
         .from('reservations')
-        .insert([payload])
+        .insert([payload as any])
         .select('id')
         .single();
   if (error) throw error;
 
-      // Build QR payload with reservation info
-      const qrPayload = {
-        reservation_id: inserted?.id,
-        order_type: tableInfo?.orderType ?? 'takeout',
-        table: providedTable,
-        party_size: partySize,
-        total: totalAmount,
-        created_at: new Date().toISOString(),
-        client_id: CLIENT_ID,
-        contact_phone: contactPhone ?? null,
-        requested_slot: reservationDate && reservationTime ? `${reservationDate} ${reservationTime}` : null,
-      };
-      try {
-        const dataUrl = await QRCode.toDataURL(JSON.stringify(qrPayload), { width: 300, margin: 1 });
-        setQrDataUrl(dataUrl);
-        setQrOpen(true);
-      } catch (e) {
-        // ignore QR generation issues
-      }
+      // No longer generating QR code - removed popup functionality
 
   setLastReservation({
         reservationId: inserted?.id,
         orderType: (tableInfo?.orderType ?? 'takeout'),
         tableNumber: providedTable,
         partySize,
-        total: totalAmount,
+        total: finalAmount,
       });
 
-      toast({
-        title: "Order Placed!",
-        description: `Your order has been placed${tableInfo?.tableNumber ? ` for table ${tableInfo.tableNumber}` : ' for takeout'}. Estimated time: 15-20 minutes.`,
+      // Calculate the maximum wait time from all cart items
+      let maxWaitTime = 0;
+      cartItems.forEach(cartItem => {
+        const dishData = remoteMenuItems?.find(item => item.id === cartItem.id);
+        if (dishData?.wait_time && dishData.wait_time > maxWaitTime) {
+          maxWaitTime = dishData.wait_time;
+        }
       });
 
-      // Award loyalty points for logged-in users: 1 point per 10 currency units (floor)
+      // Create wait time notification message
+      const waitTimeMessage = maxWaitTime > 0 
+        ? `Your wait time is: ${maxWaitTime} minutes`
+        : `Your wait time is: 15-20 minutes`;
+
+      // Award loyalty points for logged-in users
+      let pointsEarned = 0;
       if (user) {
         try {
-          const points = Math.floor(totalAmount / 10);
-          if (points > 0) {
-            const { data: award, error: awardErr } = await supabase.rpc('award_points', {
-              p_user_id: user.id,
-              amount: points,
-              reason: 'order',
-              metadata: { reservation_id: inserted?.id }
-            });
-            if (!awardErr) setLoyaltyPoints(award as number);
+          // Calculate points per dish considering custom loyalty_points
+          let totalPointsToAward = 0;
+          cartItems.forEach(cartItem => {
+            const dishData = remoteMenuItems?.find(item => item.id === cartItem.id);
+            if (dishData) {
+              if (dishData.loyalty_points !== null && dishData.loyalty_points !== undefined) {
+                // Use custom loyalty points per dish
+                totalPointsToAward += dishData.loyalty_points * cartItem.quantity;
+              } else {
+                // Use default calculation: 1 point per 10 currency units
+                const dishTotal = dishData.price * cartItem.quantity;
+                totalPointsToAward += Math.floor(dishTotal / 10);
+              }
+            }
+          });
+
+          if (totalPointsToAward > 0) {
+            await awardPoints(totalPointsToAward, 'order', { reservation_id: inserted?.id });
+            pointsEarned = totalPointsToAward;
           }
         } catch (e) {
           // non-blocking: ignore loyalty errors
           console.error('Failed to award loyalty points', e);
         }
       }
+
+      toast({
+        title: "Order Placed!",
+        description: `Your order has been placed${tableInfo?.tableNumber ? ` for table ${tableInfo.tableNumber}` : ' for takeout'}. ${loyaltyPointsUsed > 0 ? `Saved ${loyaltyDiscount.toFixed(2)} MAD with loyalty points! ` : ''}${pointsEarned > 0 ? `Earned ${pointsEarned} loyalty points! ` : ''}${waitTimeMessage}.`,
+      });
 
       // Reset cart and show success
       setCartItems([]);
@@ -318,42 +340,75 @@ const Index = () => {
       <header className="bg-card/90 backdrop-blur-sm border-b sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Digital Menu
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {tableInfo?.orderType === 'dine-in' && tableInfo?.tableNumber
-                  ? `Table ${tableInfo.tableNumber} • Dine In`
-                  : 'Takeout Order'
-                }
-              </p>
+            <div className="flex items-center gap-3 sm:gap-4">
+              <img 
+                src="/placeholder.svg" 
+                alt="Dar Lmeknassia" 
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-primary/20"
+              />
+              <div>
+                <h1 className="text-lg sm:text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                  Dar Lmeknassia
+                </h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
+                  {tableInfo?.orderType === 'dine-in' && tableInfo?.tableNumber
+                    ? `Table ${tableInfo.tableNumber} • Dine In`
+                    : 'Takeout Order'
+                  }
+                </p>
+              </div>
             </div>
-            
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Social Media Links - Hidden on very small screens */}
+              <div className="hidden sm:flex items-center gap-2">
+                <a 
+                  href="https://www.instagram.com/dar_lmeknessia" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-2 hover:bg-muted rounded-md transition-colors"
+                  title="Follow us on Instagram"
+                >
+                  <Instagram className="w-5 h-5 text-muted-foreground hover:text-primary" />
+                </a>
+                <a 
+                  href="https://www.tripadvisor.fr/Restaurant_Review-g479761-d23790414-Reviews-Teranga-Dakhla_Dakhla_Oued_Ed_Dahab.html" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-2 hover:bg-muted rounded-md transition-colors"
+                  title="View us on TripAdvisor"
+                >
+                  <ExternalLink className="w-5 h-5 text-muted-foreground hover:text-primary" />
+                </a>
+              </div>
+              
               {!loading && (
                 <>
                   {user ? (
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <div className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground">
                         <User className="w-4 h-4" />
-                        {user.email}
+                        <span className="hidden md:inline">{user.email}</span>
                         {typeof loyaltyPoints === 'number' && (
-                          <Badge variant="secondary" className="ml-2">{loyaltyPoints} pts</Badge>
+                          <Badge variant="secondary" className="ml-2 text-xs">{loyaltyPoints} pts</Badge>
                         )}
                       </div>
+                      {typeof loyaltyPoints === 'number' && (
+                        <Badge variant="secondary" className="sm:hidden text-xs">{loyaltyPoints} pts</Badge>
+                      )}
                       <Button
                         variant="outline"
+                        onClick={() => setFollowOpen(true)}
+                        className="text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2 rounded-full border-2 hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-300"
                         size="sm"
-                        onClick={() => signOut()}
                       >
-                        <LogOut className="w-4 h-4 mr-1" />
-                        Sign Out
+                        <span className="hidden sm:inline">Reservations</span>
+                        <span className="sm:hidden">Orders</span>
                       </Button>
                     </div>
                   ) : (
                     <Link to="/auth">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="rounded-full px-3 sm:px-6 py-1 sm:py-2 border-2 hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-300 text-xs sm:text-sm">
                         Sign In
                       </Button>
                     </Link>
@@ -362,17 +417,12 @@ const Index = () => {
               )}
               <Button
                 variant="outline"
-                onClick={() => setShowTableSelection(true)}
-                className="text-sm"
+                size="sm"
+                onClick={() => signOut()}
+                className="px-2 sm:px-3 py-1 sm:py-2 rounded-full border-2 hover:bg-accent hover:text-accent-foreground transition-all duration-300"
+                title="Sign Out"
               >
-                Change Order Type
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setFollowOpen(true)}
-                className="text-sm"
-              >
-                My Reservations
+                <LogOut className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -390,15 +440,17 @@ const Index = () => {
       </Dialog>
 
       {/* Category Filter */}
-      <CategoryFilter
-        categories={categories}
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-      />
+      <div className="pt-4 sm:pt-8 pb-4 sm:pb-6">
+        <CategoryFilter
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+        />
+      </div>
 
       {/* Menu Items */}
-      <main className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 pb-20 sm:pb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {filteredItems.map((item) => {
             const cartItem = cartItems.find(cartItem => cartItem.id === item.id);
             return (
@@ -413,8 +465,8 @@ const Index = () => {
         </div>
 
         {filteredItems.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No items found in this category.</p>
+          <div className="text-center py-8 sm:py-12">
+            <p className="text-muted-foreground text-sm sm:text-base">No items found in this category.</p>
           </div>
         )}
       </main>
@@ -430,30 +482,7 @@ const Index = () => {
         isOpen={isCartOpen}
         onToggle={() => setIsCartOpen(!isCartOpen)}
       isLoggedIn={!!user}
-        extraFields={(
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-1 space-y-1">
-              <Label htmlFor="res-date">Reservation date</Label>
-              <Input
-                id="res-date"
-                type="date"
-                value={reservationDate}
-                onChange={(e) => setReservationDate(e.target.value)}
-              />
-            </div>
-            <div className="col-span-1 space-y-1">
-              <Label htmlFor="res-time">Reservation time</Label>
-              <Input
-                id="res-time"
-                type="time"
-                step={900}
-                value={reservationTime}
-                onChange={(e) => setReservationTime(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-        canProceed={!(tableInfo?.orderType === 'dine-in') || (Boolean(reservationDate) && Boolean(reservationTime))}
+        canProceed={true}
       />
     </div>
   );

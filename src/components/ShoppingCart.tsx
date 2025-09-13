@@ -7,6 +7,7 @@ import { ShoppingCart as CartIcon, Plus, Minus, X, CheckCircle } from 'lucide-re
 import { MenuItem } from './MenuCard';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LoyaltyRedemption } from './LoyaltyRedemption';
 
 export interface CartItem extends MenuItem {
   quantity: number;
@@ -16,10 +17,11 @@ interface ShoppingCartProps {
   items: CartItem[];
   onUpdateQuantity: (itemId: string, newQuantity: number) => void;
   onRemoveItem: (itemId: string) => void;
-  onCheckout: (contactPhone?: string) => void;
+  onCheckout: (contactPhone?: string, loyaltyPointsUsed?: number) => void;
   isOpen: boolean;
   onToggle: () => void;
   isLoggedIn?: boolean;
+  loyaltyPoints?: number;
   extraFields?: React.ReactNode;
   canProceed?: boolean;
 }
@@ -32,6 +34,7 @@ export const ShoppingCart = ({
   isOpen,
   onToggle,
   isLoggedIn = false,
+  loyaltyPoints = 0,
   extraFields,
   canProceed = true,
 }: ShoppingCartProps) => {
@@ -39,20 +42,29 @@ export const ShoppingCart = ({
   const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const [phone, setPhone] = useState('');
   const [touched, setTouched] = useState(false);
+  const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0);
+  
   const digitsCount = useMemo(() => (phone.replace(/\D/g, '').length), [phone]);
   const phoneValid = useMemo(() => digitsCount >= 8 && digitsCount <= 15, [digitsCount]);
+  const finalTotal = useMemo(() => Math.max(0, totalPrice - loyaltyDiscount), [totalPrice, loyaltyDiscount]);
+
+  const handleLoyaltyRedemption = (pointsToUse: number, discountAmount: number) => {
+    setLoyaltyPointsUsed(pointsToUse);
+    setLoyaltyDiscount(discountAmount);
+  };
 
   if (!isOpen) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
         <Button
           onClick={onToggle}
-          className="bg-gradient-primary hover:opacity-90 shadow-glow rounded-full p-4"
+          className="bg-gradient-primary hover:opacity-90 shadow-glow rounded-full p-3 sm:p-4"
           size="lg"
         >
-          <CartIcon className="h-6 w-6" />
+          <CartIcon className="h-5 w-5 sm:h-6 sm:w-6" />
           {totalItems > 0 && (
-            <Badge className="absolute -top-2 -right-2 bg-secondary text-secondary-foreground">
+            <Badge className="absolute -top-2 -right-2 bg-secondary text-secondary-foreground text-xs">
               {totalItems}
             </Badge>
           )}
@@ -63,12 +75,12 @@ export const ShoppingCart = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
-      <div className="fixed bottom-0 right-0 top-0 w-full max-w-md bg-background shadow-xl">
+      <div className="fixed bottom-0 left-0 right-0 top-0 sm:right-0 sm:left-auto w-full sm:max-w-md bg-background shadow-xl">
         <Card className="h-full flex flex-col border-0">
           <CardHeader className="bg-gradient-warm">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <CartIcon className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <CartIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                 Your Order ({totalItems} items)
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={onToggle}>
@@ -77,41 +89,40 @@ export const ShoppingCart = ({
             </div>
           </CardHeader>
 
-          <CardContent className="flex-1 overflow-auto p-4 space-y-4">
-            {items.length === 0 ? (
+          <CardContent className="flex-1 overflow-auto p-3 sm:p-4 space-y-3 sm:space-y-4">{items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <CartIcon className="h-16 w-16 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Your cart is empty</p>
-                <p className="text-sm text-muted-foreground">Add some delicious items to get started!</p>
+                <CartIcon className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground text-sm sm:text-base">Your cart is empty</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Add some delicious items to get started!</p>
               </div>
             ) : (
               <>
                 {items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 bg-muted/50 p-3 rounded-lg">
+                  <div key={item.id} className="flex items-center gap-2 sm:gap-3 bg-muted/50 p-2 sm:p-3 rounded-lg">
                     <img 
                       src={item.image} 
                       alt={item.name}
-                      className="w-16 h-16 object-cover rounded-md"
+                      className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md"
                     />
                     
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-sm truncate">{item.name}</h4>
-                      <p className="text-sm text-muted-foreground">
+                      <h4 className="font-semibold text-xs sm:text-sm truncate">{item.name}</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         {item.price.toFixed(2)} MAD each
                       </p>
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                        className="h-8 w-8 p-0"
+                        className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                       >
-                        <Minus className="h-3 w-3" />
+                        <Minus className="h-2 w-2 sm:h-3 sm:w-3" />
                       </Button>
                       
-                      <span className="font-semibold min-w-[24px] text-center">
+                      <span className="font-semibold min-w-[16px] sm:min-w-[24px] text-center text-xs sm:text-sm">
                         {item.quantity}
                       </span>
                       
@@ -119,18 +130,18 @@ export const ShoppingCart = ({
                         variant="outline"
                         size="sm"
                         onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                        className="h-8 w-8 p-0"
+                        className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-2 w-2 sm:h-3 sm:w-3" />
                       </Button>
                       
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => onRemoveItem(item.id)}
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-2 w-2 sm:h-3 sm:w-3" />
                       </Button>
                     </div>
                   </div>
@@ -139,24 +150,38 @@ export const ShoppingCart = ({
                 <Separator />
                 
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs sm:text-sm">
                     <span>Subtotal</span>
                     <span>{totalPrice.toFixed(2)} MAD</span>
                   </div>
-                  <div className="flex justify-between font-bold text-lg">
+                  {loyaltyDiscount > 0 && (
+                    <div className="flex justify-between text-xs sm:text-sm text-green-600">
+                      <span>Loyalty discount ({loyaltyPointsUsed} pts)</span>
+                      <span>-{loyaltyDiscount.toFixed(2)} MAD</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-base sm:text-lg">
                     <span>Total</span>
                     <span className="bg-gradient-primary bg-clip-text text-transparent">
-                      {totalPrice.toFixed(2)} MAD
+                      {finalTotal.toFixed(2)} MAD
                     </span>
                   </div>
+                  
+                  {/* Loyalty Points Redemption */}
+                  <LoyaltyRedemption
+                    totalAmount={totalPrice}
+                    onPointsRedemption={handleLoyaltyRedemption}
+                    isLoggedIn={isLoggedIn}
+                  />
+                  
                   {extraFields && (
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-3 sm:mt-4 space-y-2">
                       {extraFields}
                     </div>
                   )}
-                  {!isLoggedIn && items.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      <Label htmlFor="contact-phone">Phone number (required)</Label>
+                  {items.length > 0 && (
+                    <div className="mt-3 sm:mt-4 space-y-2">
+                      <Label htmlFor="contact-phone" className="text-xs sm:text-sm">Phone number (optional)</Label>
                       <Input
                         id="contact-phone"
                         type="tel"
@@ -164,8 +189,9 @@ export const ShoppingCart = ({
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         onBlur={() => setTouched(true)}
+                        className="text-sm"
                       />
-                      {touched && !phoneValid && (
+                      {touched && phone && !phoneValid && (
                         <p className="text-xs text-destructive">Please enter a valid phone number (8–15 digits).</p>
                       )}
                     </div>
@@ -176,14 +202,14 @@ export const ShoppingCart = ({
           </CardContent>
 
           {items.length > 0 && (
-            <div className="p-4 border-t">
+            <div className="p-3 sm:p-4 border-t">
               <Button 
-                onClick={() => onCheckout(isLoggedIn ? undefined : phone.trim())}
-                className="w-full bg-gradient-primary hover:opacity-90 transition-smooth"
+                onClick={() => onCheckout(phone.trim() || undefined, loyaltyPointsUsed)}
+                className="w-full bg-gradient-primary hover:opacity-90 transition-smooth text-sm sm:text-base"
                 size="lg"
-                disabled={(!isLoggedIn && !phoneValid) || !canProceed}
+                disabled={!canProceed || (phone && !phoneValid)}
               >
-                <CheckCircle className="mr-2 h-5 w-5" />
+                <CheckCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                 Proceed to Checkout
               </Button>
             </div>
