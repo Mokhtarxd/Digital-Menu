@@ -113,27 +113,38 @@ async function sendBusinessAPIMessage(message: string): Promise<boolean> {
 }
 
 /**
- * Send message via WhatsApp Web (fallback method)
+ * Send message via Webhook (simplest free solution)
  */
-function sendWhatsAppWebMessage(message: string): boolean {
+async function sendWebhookMessage(message: string, orderData: WhatsAppOrderData): Promise<boolean> {
+  const webhookURL = import.meta.env.VITE_WEBHOOK_URL;
+  
+  if (!webhookURL) {
+    console.log('📱 WhatsApp Message (Copy this text and send manually):');
+    console.log('─'.repeat(60));
+    console.log(message);
+    console.log('─'.repeat(60));
+    console.log(`📞 Send to: ${RESTAURANT_PHONE}`);
+    console.log('🔗 WhatsApp Web URL:', `https://wa.me/${RESTAURANT_PHONE.replace('+', '')}?text=${encodeURIComponent(message)}`);
+    return true;
+  }
+
   try {
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappURL = `https://wa.me/${RESTAURANT_PHONE.replace('+', '')}?text=${encodedMessage}`;
+    const response = await axios.post(webhookURL, {
+      message,
+      orderData,
+      timestamp: new Date().toISOString(),
+      restaurant_phone: RESTAURANT_PHONE,
+      whatsapp_url: `https://wa.me/${RESTAURANT_PHONE.replace('+', '')}?text=${encodeURIComponent(message)}`
+    });
     
-    // In a real scenario, you might want to use a webhook service
-    // For now, we'll log the message and URL
-    console.log('WhatsApp Web URL:', whatsappURL);
-    console.log('Message to send:', message);
-    
-    // You could integrate with services like:
-    // - Webhooks.site
-    // - Zapier
-    // - Make.com (formerly Integromat)
-    // - Or your own backend service
-    
+    console.log('✅ Webhook sent successfully:', response.status);
+    console.log('📱 Message preview:', message);
     return true;
   } catch (error) {
-    console.error('Failed to send WhatsApp Web message:', error);
+    console.error('❌ Webhook failed, falling back to console:', error);
+    // Fallback to console log
+    console.log('📱 WhatsApp Message:');
+    console.log(message);
     return false;
   }
 }
@@ -146,7 +157,7 @@ export async function sendOrderNotification(orderData: WhatsAppOrderData): Promi
     const message = formatOrderMessage(orderData, true);
     
     if (USE_WHATSAPP_WEB) {
-      return sendWhatsAppWebMessage(message);
+      return await sendWebhookMessage(message, orderData);
     } else {
       return await sendBusinessAPIMessage(message);
     }
@@ -164,7 +175,7 @@ export async function sendCancellationNotification(orderData: WhatsAppOrderData)
     const message = formatOrderMessage(orderData, false);
     
     if (USE_WHATSAPP_WEB) {
-      return sendWhatsAppWebMessage(message);
+      return await sendWebhookMessage(message, orderData);
     } else {
       return await sendBusinessAPIMessage(message);
     }
