@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { useToast } from '../hooks/use-toast';
+import { sendCancellationNotification } from '../lib/whatsapp';
 
 type Reservation = Database['public']['Tables']['reservations']['Row'];
 type TableRow = Database['public']['Tables']['tables']['Row'];
@@ -152,6 +153,33 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
                             });
                           } else {
                             setReservations(prev => prev.map(x => x.id === r.id ? { ...x, status: 'cancelled' } as Reservation : x));
+                            
+                            // Send WhatsApp cancellation notification
+                            try {
+                              const notes = parseNotes(r.notes);
+                              if (notes.items && Array.isArray(notes.items)) {
+                                const orderData = {
+                                  orderType: notes.orderType || 'takeout',
+                                  tableNumber: notes.tableNumber ? String(notes.tableNumber) : null,
+                                  items: notes.items.map((item: any) => ({
+                                    id: item.id,
+                                    name: item.name,
+                                    qty: item.qty || 1,
+                                    price: 0 // Price info not always stored in notes
+                                  })),
+                                  subtotal: notes.subtotal || notes.total || 0,
+                                  loyaltyPointsUsed: notes.loyaltyPointsUsed || 0,
+                                  loyaltyDiscount: notes.loyaltyDiscount || 0,
+                                  total: notes.total || 0,
+                                  contact_phone: notes.contact_phone || null,
+                                  reservationId: r.id
+                                };
+                                await sendCancellationNotification(orderData);
+                              }
+                            } catch (e) {
+                              console.error('Failed to send cancellation notification:', e);
+                              // Don't block the cancellation process if WhatsApp fails
+                            }
                           }
                         } catch (e) {
                           // ignored; RLS may block

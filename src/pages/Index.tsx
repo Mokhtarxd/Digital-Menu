@@ -16,6 +16,7 @@ import { ReservationsPanel } from '@/components/ReservationsPanel';
 // Images are provided by Supabase rows (image_url). Use a placeholder when missing.
 import { supabase, CLIENT_ID } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { sendOrderNotification } from '@/lib/whatsapp';
 
 // No static sample menu — the UI uses Supabase `dishes` rows directly.
 
@@ -280,6 +281,31 @@ const Index = () => {
           // non-blocking: ignore loyalty errors
           console.error('Failed to award loyalty points', e);
         }
+      }
+
+      // Send WhatsApp notification
+      try {
+        const orderData = {
+          orderType: tableInfo?.orderType ?? 'takeout',
+          tableNumber: providedTable,
+          items: cartItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            qty: item.quantity,
+            price: item.price
+          })),
+          subtotal: totalAmount,
+          loyaltyPointsUsed: loyaltyPointsUsed || 0,
+          loyaltyDiscount: loyaltyDiscount,
+          total: finalAmount,
+          contact_phone: contactPhone ?? null,
+          reservationId: inserted?.id
+        };
+
+        await sendOrderNotification(orderData);
+      } catch (e) {
+        console.error('Failed to send WhatsApp notification:', e);
+        // Don't block the checkout process if WhatsApp fails
       }
 
       toast({
