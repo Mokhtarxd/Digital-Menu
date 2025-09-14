@@ -1,4 +1,4 @@
-# Welcome to your Lovable project
+# Dar Lmeknessiya - Digital Menu System
 
 ## Project info
 
