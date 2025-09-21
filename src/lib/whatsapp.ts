@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { sendMultiChannelNotification } from './notifications';
 
 interface OrderItem {
   id: string;
@@ -113,51 +114,100 @@ async function sendBusinessAPIMessage(message: string): Promise<boolean> {
 }
 
 /**
- * Send message via Webhook (simplest free solution)
+ * Send message via automatic WhatsApp solution
  */
-async function sendWebhookMessage(message: string, orderData: WhatsAppOrderData): Promise<boolean> {
+async function sendAutomaticWhatsAppMessage(message: string, orderData: WhatsAppOrderData): Promise<boolean> {
+  // Try multiple automatic methods
+
+  // Method 1: Try webhook if configured
   const webhookURL = import.meta.env.VITE_WEBHOOK_URL;
-  
-  if (!webhookURL) {
-    console.log('📱 WhatsApp Message (Copy this text and send manually):');
-    console.log('─'.repeat(60));
-    console.log(message);
-    console.log('─'.repeat(60));
-    console.log(`📞 Send to: ${RESTAURANT_PHONE}`);
-    console.log('🔗 WhatsApp Web URL:', `https://wa.me/${RESTAURANT_PHONE.replace('+', '')}?text=${encodeURIComponent(message)}`);
-    return true;
+  if (webhookURL) {
+    try {
+      const response = await axios.post(webhookURL, {
+        message,
+        orderData,
+        timestamp: new Date().toISOString(),
+        restaurant_phone: RESTAURANT_PHONE,
+        action: 'send_whatsapp',
+        whatsapp_url: `https://wa.me/${RESTAURANT_PHONE.replace('+', '')}?text=${encodeURIComponent(message)}`
+      });
+      
+      console.log('✅ Webhook sent successfully - WhatsApp will be sent automatically');
+      return true;
+    } catch (error) {
+      console.warn('Webhook failed, trying next method:', error);
+    }
   }
 
+  // Method 2: Use a free automation service (IFTTT/Zapier style)
   try {
-    const response = await axios.post(webhookURL, {
-      message,
-      orderData,
-      timestamp: new Date().toISOString(),
-      restaurant_phone: RESTAURANT_PHONE,
-      whatsapp_url: `https://wa.me/${RESTAURANT_PHONE.replace('+', '')}?text=${encodeURIComponent(message)}`
-    });
-    
-    console.log('✅ Webhook sent successfully:', response.status);
-    console.log('📱 Message preview:', message);
-    return true;
+    // Send to a free service that can trigger WhatsApp
+    const automationResponse = await axios.post('https://maker.ifttt.com/trigger/whatsapp_order/with/key/YOUR_KEY', {
+      value1: message,
+      value2: RESTAURANT_PHONE,
+      value3: new Date().toISOString()
+    }).catch(() => null);
+
+    if (automationResponse?.status === 200) {
+      console.log('✅ IFTTT automation triggered - WhatsApp will be sent automatically');
+      return true;
+    }
   } catch (error) {
-    console.error('❌ Webhook failed, falling back to console:', error);
-    // Fallback to console log
-    console.log('📱 WhatsApp Message:');
-    console.log(message);
-    return false;
+    console.warn('IFTTT automation failed, trying next method:', error);
   }
+
+  // Method 3: Use browser notification + automatic WhatsApp tab opening
+  try {
+    // Show browser notification
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification('New Order Received!', {
+          body: `Order for ${orderData.tableNumber || 'takeout'} - ${orderData.total} MAD`,
+          icon: '/dar-lmeknessia.png'
+        });
+      } else if (Notification.permission !== 'denied') {
+        await Notification.requestPermission();
+      }
+    }
+
+    // Automatically open WhatsApp in new tab
+    const whatsappURL = `https://wa.me/${RESTAURANT_PHONE.replace('+', '')}?text=${encodeURIComponent(message)}`;
+    const newWindow = window.open(whatsappURL, '_blank');
+    
+    if (newWindow) {
+      console.log('✅ WhatsApp opened automatically in new tab');
+      
+      // Optional: Try to focus the window after a brief delay
+      setTimeout(() => {
+        newWindow.focus();
+      }, 500);
+      
+      return true;
+    }
+  } catch (error) {
+    console.warn('Browser automation failed:', error);
+  }
+
+  // Method 4: Fallback - at least log the message clearly
+  console.error('❌ All automatic methods failed. Message details:');
+  console.log('📱 Restaurant Phone:', RESTAURANT_PHONE);
+  console.log('📝 Message:', message);
+  return false;
 }
 
 /**
- * Send order notification via WhatsApp
+ * Send order notification via multiple automatic channels
  */
 export async function sendOrderNotification(orderData: WhatsAppOrderData): Promise<boolean> {
   try {
     const message = formatOrderMessage(orderData, true);
     
+    // Try automatic notifications first (Telegram, Discord, etc.)
+    await sendMultiChannelNotification(orderData, true);
+    
+    // Then try WhatsApp methods
     if (USE_WHATSAPP_WEB) {
-      return await sendWebhookMessage(message, orderData);
+      return await sendAutomaticWhatsAppMessage(message, orderData);
     } else {
       return await sendBusinessAPIMessage(message);
     }
@@ -168,14 +218,18 @@ export async function sendOrderNotification(orderData: WhatsAppOrderData): Promi
 }
 
 /**
- * Send cancellation notification via WhatsApp
+ * Send cancellation notification via multiple automatic channels
  */
 export async function sendCancellationNotification(orderData: WhatsAppOrderData): Promise<boolean> {
   try {
     const message = formatOrderMessage(orderData, false);
     
+    // Try automatic notifications first (Telegram, Discord, etc.)
+    await sendMultiChannelNotification(orderData, false);
+    
+    // Then try WhatsApp methods
     if (USE_WHATSAPP_WEB) {
-      return await sendWebhookMessage(message, orderData);
+      return await sendAutomaticWhatsAppMessage(message, orderData);
     } else {
       return await sendBusinessAPIMessage(message);
     }

@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogOut, BarChart3, Users, Utensils, Calendar, Table } from 'lucide-react';
+import { LogOut, BarChart3, Users, Utensils, Calendar, Table, Bell } from 'lucide-react';
 import { TablesManagement } from '@/components/admin/TablesManagement';
 import { ReservationsManagement } from '@/components/admin/ReservationsManagement';
 import { MenuManagement } from '@/components/admin/MenuManagement';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { OverviewDashboard } from '@/components/admin/OverviewDashboard';
+import { DiscordTest } from '@/components/DiscordTest';
 
 const AdminDashboard = () => {
   const { user, signOut } = useAdminAuth();
@@ -42,7 +43,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <main className="p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Overview
@@ -62,6 +63,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Users
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Notifications
             </TabsTrigger>
           </TabsList>
 
@@ -83,6 +88,17 @@ const AdminDashboard = () => {
 
           <TabsContent value="users">
             <UserManagement />
+          </TabsContent>
+
+          <TabsContent value="notifications" className="space-y-6">
+            <div className="bg-white p-6 rounded-lg border">
+              <h2 className="text-xl font-semibold mb-4">🔔 Notification System Test</h2>
+              <p className="text-gray-600 mb-6">
+                Test your automatic Discord notifications to ensure orders and cancellations 
+                are sent correctly to your Discord channel.
+              </p>
+              <DiscordTest />
+            </div>
           </TabsContent>
         </Tabs>
       </main>
