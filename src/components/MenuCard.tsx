@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +26,13 @@ interface MenuCardProps {
 
 export const MenuCard = ({ item, onAddToCart, cartQuantity = 0 }: MenuCardProps) => {
   const [quantity, setQuantity] = useState(cartQuantity);
+  const { t } = useTranslation();
+  const fidelityPoints = useMemo(() => {
+    const base = item.loyalty_points !== null && item.loyalty_points !== undefined
+      ? item.loyalty_points
+      : Math.floor(item.price / 10);
+    return base ?? 0;
+  }, [item.loyalty_points, item.price]);
 
   const handleAddToCart = () => {
     const newQuantity = quantity + 1;
@@ -52,12 +60,12 @@ export const MenuCard = ({ item, onAddToCart, cartQuantity = 0 }: MenuCardProps)
           variant={item.available ? "default" : "destructive"}
           className="absolute top-1 sm:top-2 right-1 sm:right-2 text-xs"
         >
-          {item.available ? "Available" : "Out of Stock"}
+          {item.available ? t('menuCard.available') : t('menuCard.outOfStock')}
         </Badge>
         {!item.available && (
           <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
             <span className="text-white text-sm sm:text-lg font-bold bg-red-600 px-2 sm:px-3 py-1 rounded-md">
-              OUT OF STOCK
+              {t('menuCard.outOfStock')}
             </span>
           </div>
         )}
@@ -77,10 +85,7 @@ export const MenuCard = ({ item, onAddToCart, cartQuantity = 0 }: MenuCardProps)
               </span>
               {item.available && (
                 <span className="text-xs text-gray-500 hidden sm:block">
-                  {item.loyalty_points !== null && item.loyalty_points !== undefined 
-                    ? item.loyalty_points 
-                    : Math.floor(item.price / 10)
-                  } fidelity points
+                  {t('menuCard.fidelityPoints', { count: fidelityPoints })}
                 </span>
               )}
             </div>
@@ -107,7 +112,7 @@ export const MenuCard = ({ item, onAddToCart, cartQuantity = 0 }: MenuCardProps)
                   className="h-6 sm:h-7 px-2 sm:px-3 text-xs rounded-full bg-gradient-primary hover:opacity-90 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
                 >
                   <Plus className="h-2 w-2 sm:h-3 sm:w-3" />
-                  {quantity === 0 && <span className="ml-1 font-semibold hidden sm:inline">Add</span>}
+                  {quantity === 0 && <span className="ml-1 font-semibold hidden sm:inline">{t('menuCard.add')}</span>}
                 </Button>
               </div>
             ) : (
@@ -116,8 +121,8 @@ export const MenuCard = ({ item, onAddToCart, cartQuantity = 0 }: MenuCardProps)
                 size="sm"
                 className="h-6 sm:h-7 px-2 sm:px-3 text-xs rounded-full bg-muted text-muted-foreground cursor-not-allowed"
               >
-                <span className="hidden sm:inline">Unavailable</span>
-                <span className="sm:hidden">N/A</span>
+                <span className="hidden sm:inline">{t('menuCard.unavailable')}</span>
+                <span className="sm:hidden">{t('menuCard.unavailableShort')}</span>
               </Button>
             )}
           </div>

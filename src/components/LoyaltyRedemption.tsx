@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +21,11 @@ export const LoyaltyRedemption = ({
 }: LoyaltyRedemptionProps) => {
   const { points, loading } = useLoyaltyPoints();
   const [pointsToUse, setPointsToUse] = useState(0);
+  const { t, i18n } = useTranslation();
+  const direction = useMemo(
+    () => i18n.dir(i18n.resolvedLanguage || i18n.language),
+    [i18n.language, i18n.resolvedLanguage]
+  );
 
   // Conversion rate: 1 MAD = 1 point, so 1 point = 1 MAD discount
   const pointsToMadRate = 1; // 1 point = 1 MAD
@@ -47,11 +53,11 @@ export const LoyaltyRedemption = ({
 
   if (!isLoggedIn) {
     return (
-      <Card className="border-orange-200 bg-orange-50">
+      <Card className="border-orange-200 bg-orange-50" dir={direction}>
         <CardContent className="pt-4">
           <div className="flex items-center gap-2 text-sm text-orange-700">
             <Coins className="h-4 w-4" />
-            <span>Sign in to use loyalty points</span>
+            <span>{t('loyalty.signInPrompt')}</span>
           </div>
         </CardContent>
       </Card>
@@ -60,11 +66,11 @@ export const LoyaltyRedemption = ({
 
   if (loading) {
     return (
-      <Card className="border-orange-200 bg-orange-50">
+      <Card className="border-orange-200 bg-orange-50" dir={direction}>
         <CardContent className="pt-4">
           <div className="flex items-center gap-2 text-sm text-orange-700">
             <Coins className="h-4 w-4 animate-spin" />
-            <span>Loading points...</span>
+            <span>{t('loyalty.loading')}</span>
           </div>
         </CardContent>
       </Card>
@@ -73,11 +79,11 @@ export const LoyaltyRedemption = ({
 
   if (points === 0) {
     return (
-      <Card className="border-gray-200 bg-gray-50">
+      <Card className="border-gray-200 bg-gray-50" dir={direction}>
         <CardContent className="pt-4">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Coins className="h-4 w-4" />
-            <span>No loyalty points available</span>
+            <span>{t('loyalty.none')}</span>
           </div>
         </CardContent>
       </Card>
@@ -85,24 +91,24 @@ export const LoyaltyRedemption = ({
   }
 
   return (
-    <Card className="border-orange-200 bg-orange-50">
+    <Card className="border-orange-200 bg-orange-50" dir={direction}>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Coins className="h-4 w-4 text-orange-600" />
-          Use Loyalty Points
+          {t('loyalty.use')}
           <Badge variant="secondary" className="ml-auto">
-            {points} points available
+            {t('loyalty.available', { points })}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="text-xs text-orange-700">
-          1 point = {pointsToMadRate} MAD • Max usable: {maxPointsUsable} points
+          {t('loyalty.conversion', { value: pointsToMadRate, max: maxPointsUsable })}
         </div>
         
         <div className="space-y-2">
           <Label htmlFor="points-input" className="text-sm">
-            Points to use
+            {t('loyalty.pointsLabel')}
           </Label>
           <div className="flex items-center gap-2">
             <Button
@@ -144,7 +150,7 @@ export const LoyaltyRedemption = ({
               onClick={() => quickSelect(0.25)}
               className="flex-1 text-xs"
             >
-              25%
+              {t('loyalty.quickSelect.quarter')}
             </Button>
             <Button
               type="button"
@@ -153,7 +159,7 @@ export const LoyaltyRedemption = ({
               onClick={() => quickSelect(0.5)}
               className="flex-1 text-xs"
             >
-              50%
+              {t('loyalty.quickSelect.half')}
             </Button>
             <Button
               type="button"
@@ -162,7 +168,7 @@ export const LoyaltyRedemption = ({
               onClick={() => quickSelect(1)}
               className="flex-1 text-xs"
             >
-              Max
+              {t('loyalty.quickSelect.max')}
             </Button>
           </div>
         )}
@@ -170,12 +176,12 @@ export const LoyaltyRedemption = ({
         {pointsToUse > 0 && (
           <div className="bg-white p-2 rounded border border-orange-200">
             <div className="flex justify-between text-sm">
-              <span>Points to redeem:</span>
+              <span>{t('loyalty.summaryPoints')}</span>
               <span className="font-medium">{pointsToUse}</span>
             </div>
             <div className="flex justify-between text-sm text-green-600 font-medium">
-              <span>Discount:</span>
-              <span>-{discountAmount.toFixed(2)} MAD</span>
+              <span>{t('loyalty.summaryDiscount')}</span>
+              <span>{t('loyalty.discountValue', { amount: discountAmount.toFixed(2) })}</span>
             </div>
           </div>
         )}

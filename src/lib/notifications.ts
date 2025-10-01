@@ -48,14 +48,20 @@ export async function sendTelegramNotification(message: string, isNewOrder: bool
 export async function sendDiscordNotification(message: string, isNewOrder: boolean = true): Promise<boolean> {
   const webhookUrl = import.meta.env.VITE_DISCORD_WEBHOOK;
   
+  console.log('Discord webhook function called');
+  console.log('Webhook URL exists:', !!webhookUrl);
+  console.log('Webhook URL length:', webhookUrl?.length || 0);
+  
   if (!webhookUrl) {
-    console.log('Discord not configured');
+    console.error('Discord webhook URL is not configured');
     return false;
   }
 
   try {
     const emoji = isNewOrder ? '🍽️' : '❌';
     const color = isNewOrder ? 0x00ff00 : 0xff0000; // Green for new, red for cancelled
+    
+    console.log('Sending Discord message to:', webhookUrl.substring(0, 50) + '...');
     
     const response = await axios.post(webhookUrl, {
       embeds: [{
@@ -69,10 +75,14 @@ export async function sendDiscordNotification(message: string, isNewOrder: boole
       }]
     });
     
-    console.log('✅ Discord notification sent successfully');
+    console.log('✅ Discord notification sent successfully, status:', response.status);
     return response.status === 204;
   } catch (error) {
     console.error('❌ Failed to send Discord notification:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('Response status:', error.response?.status);
+      console.error('Response data:', error.response?.data);
+    }
     return false;
   }
 }

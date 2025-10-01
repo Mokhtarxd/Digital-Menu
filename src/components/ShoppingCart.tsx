@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +39,11 @@ export const ShoppingCart = ({
   extraFields,
   canProceed = true,
 }: ShoppingCartProps) => {
+  const { t, i18n } = useTranslation();
+  const direction = useMemo(
+    () => i18n.dir(i18n.resolvedLanguage || i18n.language),
+    [i18n.language, i18n.resolvedLanguage]
+  );
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const [phone, setPhone] = useState('');
@@ -74,14 +80,14 @@ export const ShoppingCart = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm" dir={direction}>
       <div className="fixed bottom-0 left-0 right-0 top-0 sm:right-0 sm:left-auto w-full sm:max-w-md bg-background shadow-xl">
         <Card className="h-full flex flex-col border-0">
           <CardHeader className="bg-gradient-warm">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                 <CartIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                Your Order ({totalItems} items)
+                {t('cart.title', { count: totalItems })}
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={onToggle}>
                 <X className="h-4 w-4" />
@@ -92,8 +98,8 @@ export const ShoppingCart = ({
           <CardContent className="flex-1 overflow-auto p-3 sm:p-4 space-y-3 sm:space-y-4">{items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <CartIcon className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-sm sm:text-base">Your cart is empty</p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Add some delicious items to get started!</p>
+                <p className="text-muted-foreground text-sm sm:text-base">{t('cart.emptyTitle')}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{t('cart.emptySubtitle')}</p>
               </div>
             ) : (
               <>
@@ -108,7 +114,7 @@ export const ShoppingCart = ({
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-xs sm:text-sm truncate">{item.name}</h4>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        {item.price.toFixed(2)} MAD each
+                        {t('cart.each', { price: item.price.toFixed(2) })}
                       </p>
                     </div>
                     
@@ -151,17 +157,17 @@ export const ShoppingCart = ({
                 
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs sm:text-sm">
-                    <span>Subtotal</span>
+                    <span>{t('cart.subtotal')}</span>
                     <span>{totalPrice.toFixed(2)} MAD</span>
                   </div>
                   {loyaltyDiscount > 0 && (
                     <div className="flex justify-between text-xs sm:text-sm text-green-600">
-                      <span>Loyalty discount ({loyaltyPointsUsed} pts)</span>
+                      <span>{t('cart.loyaltyDiscount', { points: loyaltyPointsUsed })}</span>
                       <span>-{loyaltyDiscount.toFixed(2)} MAD</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-base sm:text-lg">
-                    <span>Total</span>
+                    <span>{t('cart.total')}</span>
                     <span className="bg-gradient-primary bg-clip-text text-transparent">
                       {finalTotal.toFixed(2)} MAD
                     </span>
@@ -181,18 +187,18 @@ export const ShoppingCart = ({
                   )}
                   {items.length > 0 && (
                     <div className="mt-3 sm:mt-4 space-y-2">
-                      <Label htmlFor="contact-phone" className="text-xs sm:text-sm">Phone number (optional)</Label>
+                      <Label htmlFor="contact-phone" className="text-xs sm:text-sm">{t('cart.phoneLabel')}</Label>
                       <Input
                         id="contact-phone"
                         type="tel"
-                        placeholder="e.g., +212 6 12 34 56 78"
+                        placeholder={t('cart.phonePlaceholder')}
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         onBlur={() => setTouched(true)}
                         className="text-sm"
                       />
                       {touched && phone && !phoneValid && (
-                        <p className="text-xs text-destructive">Please enter a valid phone number (8–15 digits).</p>
+                        <p className="text-xs text-destructive">{t('cart.phoneInvalid')}</p>
                       )}
                     </div>
                   )}
@@ -210,7 +216,7 @@ export const ShoppingCart = ({
                 disabled={!canProceed || (phone && !phoneValid)}
               >
                 <CheckCircle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                Proceed to Checkout
+                {t('cart.checkout')}
               </Button>
             </div>
           )}

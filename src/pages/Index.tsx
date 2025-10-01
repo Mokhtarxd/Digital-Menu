@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { MenuCard, MenuItem } from '@/components/MenuCard';
 import { ShoppingCart, CartItem } from '@/components/ShoppingCart';
@@ -17,10 +17,17 @@ import { ReservationsPanel } from '@/components/ReservationsPanel';
 import { supabase, CLIENT_ID } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { sendOrderNotification } from '@/lib/whatsapp';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 // No static sample menu — the UI uses Supabase `dishes` rows directly.
 
 const Index = () => {
+  const { t, i18n } = useTranslation();
+  const direction = useMemo(
+    () => i18n.dir(i18n.resolvedLanguage || i18n.language),
+    [i18n.language, i18n.resolvedLanguage]
+  );
   const [remoteMenuItems, setRemoteMenuItems] = useState<MenuItem[] | null>(null);
   const [loadingMenu, setLoadingMenu] = useState(false);
 
@@ -122,8 +129,8 @@ const Index = () => {
 
     if (quantityChange > 0) {
       toast({
-        title: "Added to cart",
-        description: `${item.name} added to your order`,
+        title: t('toasts.addedTitle'),
+        description: t('toasts.addedDescription', { item: item.name }),
       });
     }
   };
@@ -144,8 +151,8 @@ const Index = () => {
   const handleRemoveItem = (itemId: string) => {
     setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
     toast({
-      title: "Item removed",
-      description: "Item removed from your cart",
+      title: t('toasts.removedTitle'),
+      description: t('toasts.removedDescription'),
     });
   };
 
@@ -158,16 +165,16 @@ const Index = () => {
   const providedTable = tableInfo?.orderType === 'dine-in' ? (tableInfo?.tableNumber ?? null) : null;
     try {
       if (providedTable) {
-        const t = String(providedTable).trim();
+        const tVal = String(providedTable).trim();
         // Match either exact number (e.g., '3') or label with prefix (e.g., 'T3')
         const { data: tbl, error: tErr } = await supabase
           .from('tables')
           .select('id,label')
-          .or(`label.eq.${t},label.eq.T${t}`)
+          .or(`label.eq.${tVal},label.eq.T${tVal}`)
           .limit(1)
-          .maybeSingle();
-        if (!tErr && tbl?.id) {
-          resolvedTableId = tbl.id as string;
+          .maybeSingle<{ id: string | null; label: string | null }>();
+        if (!tErr && tbl && tbl.id) {
+          resolvedTableId = String(tbl.id);
         }
       }
     } catch { /* ignore */ }
@@ -217,22 +224,26 @@ const Index = () => {
         table_id: resolvedTableId,
         user_id: (user?.id as unknown as string) ?? null,
         party_size: partySize,
-  reserved_at: reservedAtISO,
+        reserved_at: reservedAtISO,
         notes,
-  client_id: CLIENT_ID,
+        client_id: CLIENT_ID,
       };
 
-  const { data: inserted, error } = await supabase
-        .from('reservations')
-        .insert([payload as any])
+      const { data: inserted, error } = await (supabase
+        .from('reservations') as any)
+        .insert(payload)
         .select('id')
         .single();
-  if (error) throw error;
+      if (error) throw error;
+      const reservationId = (inserted as { id: string | null } | null)?.id;
+      if (!reservationId) {
+        throw new Error('Reservation insert failed');
+      }
 
       // No longer generating QR code - removed popup functionality
 
-  setLastReservation({
-        reservationId: inserted?.id,
+      setLastReservation({
+        reservationId,
         orderType: (tableInfo?.orderType ?? 'takeout'),
         tableNumber: providedTable,
         partySize,
@@ -250,8 +261,8 @@ const Index = () => {
 
       // Create wait time notification message
       const waitTimeMessage = maxWaitTime > 0 
-        ? `Your wait time is: ${maxWaitTime} minutes`
-        : `Your wait time is: 15-20 minutes`;
+        ? t('toasts.orderPlacedWaitExact', { minutes: maxWaitTime })
+        : t('toasts.orderPlacedWaitDefault');
 
       // Award loyalty points for logged-in users
       let pointsEarned = 0;
@@ -274,7 +285,7 @@ const Index = () => {
           });
 
           if (totalPointsToAward > 0) {
-            await awardPoints(totalPointsToAward, 'order', { reservation_id: inserted?.id });
+            await awardPoints(totalPointsToAward, 'order', { reservation_id: reservationId });
             pointsEarned = totalPointsToAward;
           }
         } catch (e) {
@@ -299,7 +310,7 @@ const Index = () => {
           loyaltyDiscount: loyaltyDiscount,
           total: finalAmount,
           contact_phone: contactPhone ?? null,
-          reservationId: inserted?.id
+          reservationId
         };
 
         await sendOrderNotification(orderData);
@@ -308,9 +319,18 @@ const Index = () => {
         // Don't block the checkout process if WhatsApp fails
       }
 
+      const confirmationDetails = [
+        tableInfo?.tableNumber
+          ? t('toasts.orderPlacedTable', { table: tableInfo.tableNumber })
+          : t('toasts.orderPlacedTakeout'),
+        loyaltyPointsUsed > 0 ? t('toasts.orderPlacedDiscount', { amount: loyaltyDiscount.toFixed(2) }) : null,
+        pointsEarned > 0 ? t('toasts.orderPlacedPoints', { points: pointsEarned }) : null,
+        waitTimeMessage,
+      ].filter(Boolean).join(' ');
+
       toast({
-        title: "Order Placed!",
-        description: `Your order has been placed${tableInfo?.tableNumber ? ` for table ${tableInfo.tableNumber}` : ' for takeout'}. ${loyaltyPointsUsed > 0 ? `Saved ${loyaltyDiscount.toFixed(2)} MAD with loyalty points! ` : ''}${pointsEarned > 0 ? `Earned ${pointsEarned} loyalty points! ` : ''}${waitTimeMessage}.`,
+        title: t('toasts.orderPlacedTitle'),
+        description: confirmationDetails,
       });
 
       // Reset cart and show success
@@ -319,8 +339,8 @@ const Index = () => {
     } catch (err: unknown) {
   const message = (err && typeof err === 'object' && 'message' in (err as Record<string, unknown>)) ? String((err as Record<string, unknown>)['message']) : String(err);
       toast({
-        title: 'Checkout error',
-        description: message,
+        title: t('toasts.checkoutErrorTitle'),
+        description: t('toasts.checkoutErrorDescription', { message }),
         variant: 'destructive',
       });
     }
@@ -331,13 +351,13 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-warm">
+    <div className="min-h-screen bg-gradient-warm" dir={direction}>
       <Dialog open={qrOpen} onOpenChange={setQrOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reservation QR</DialogTitle>
+            <DialogTitle>{t('common.reservationQrTitle')}</DialogTitle>
             <DialogDescription>
-              Scan to share your reservation details with staff or companions.
+              {t('common.reservationQrDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="w-full flex flex-col items-center gap-3">
@@ -346,8 +366,14 @@ const Index = () => {
             )}
             {(() => {
               const msg = lastReservation
-                ? `Reservation confirmed. Table: ${lastReservation.orderType === 'dine-in' ? (lastReservation.tableNumber ?? 'N/A') : 'Takeout'} | Party: ${lastReservation.partySize} | Total: ${lastReservation.total}`
-                : 'Reservation confirmed.';
+                ? t('common.reservationConfirmedDetailed', {
+                    table: lastReservation.orderType === 'dine-in'
+                      ? (lastReservation.tableNumber ?? 'N/A')
+                      : t('tableSelection.takeout'),
+                    party: lastReservation.partySize,
+                    total: lastReservation.total,
+                  })
+                : t('common.reservationConfirmed');
               const phoneRaw = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_WHATSAPP_PHONE;
               const phone = phoneRaw ? phoneRaw.replace(/[^\d]/g, '') : '';
               const wa = phone
@@ -355,7 +381,7 @@ const Index = () => {
                 : `https://wa.me/?text=${encodeURIComponent(msg)}`;
               return (
                 <a href={wa} target="_blank" rel="noreferrer">
-                  <Button variant="outline">Message the restaurant on WhatsApp</Button>
+                  <Button variant="outline">{t('common.whatsappButton')}</Button>
                 </a>
               );
             })()}
@@ -382,15 +408,21 @@ const Index = () => {
                 </div>
               </div>
               
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => signOut()}
-                className="px-2 py-1 rounded-full border-2 hover:bg-accent hover:text-accent-foreground transition-all duration-300"
-                title="Sign Out"
-              >
-                <LogOut className="w-3 h-3" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <LanguageSwitcher size="sm" align="end" className="rounded-full" />
+                {user && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => signOut()}
+                    className="px-2 py-1 rounded-full border-2 hover:bg-accent hover:text-accent-foreground transition-all duration-300"
+                    title={t('common.signOut')}
+                    aria-label={t('common.signOut')}
+                  >
+                    <LogOut className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
             </div>
             
             {/* Bottom Row: Social Links + User Info + Actions */}
@@ -402,7 +434,7 @@ const Index = () => {
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="p-1.5 hover:bg-muted rounded-md transition-colors"
-                  title="Follow us on Instagram"
+                  title={t('common.instagramTitle')}
                 >
                   <Instagram className="w-4 h-4 text-muted-foreground hover:text-primary" />
                 </a>
@@ -411,14 +443,16 @@ const Index = () => {
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="p-1.5 hover:bg-muted rounded-md transition-colors"
-                  title="View us on TripAdvisor"
+                  title={t('common.tripAdvisorTitle')}
                 >
                   <ExternalLink className="w-4 h-4 text-muted-foreground hover:text-primary" />
                 </a>
                 
                 {/* Loyalty Points Badge */}
                 {!loading && user && typeof loyaltyPoints === 'number' && (
-                  <Badge variant="secondary" className="text-xs px-2 py-0.5">{loyaltyPoints} pts</Badge>
+                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                    {t('common.pointsBadge', { points: loyaltyPoints })}
+                  </Badge>
                 )}
               </div>
               
@@ -432,12 +466,12 @@ const Index = () => {
                       className="text-xs px-3 py-1 rounded-full border-2 hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-300"
                       size="sm"
                     >
-                      Orders
+                      {t('common.orders')}
                     </Button>
                   ) : (
                     <Link to="/auth">
                       <Button variant="outline" size="sm" className="rounded-full px-3 py-1 border-2 hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-300 text-xs">
-                        Sign In
+                        {t('common.signIn')}
                       </Button>
                     </Link>
                   )}
@@ -460,8 +494,8 @@ const Index = () => {
                 </h1>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {tableInfo?.orderType === 'dine-in' && tableInfo?.tableNumber
-                    ? `Table ${tableInfo.tableNumber} • Dine In`
-                    : 'Takeout Order'
+                    ? t('common.dineInStatus', { table: tableInfo.tableNumber })
+                    : t('common.takeoutOrder')
                   }
                 </p>
               </div>
@@ -475,7 +509,7 @@ const Index = () => {
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="p-2 hover:bg-muted rounded-md transition-colors"
-                  title="Follow us on Instagram"
+                  title={t('common.instagramTitle')}
                 >
                   <Instagram className="w-5 h-5 text-muted-foreground hover:text-primary" />
                 </a>
@@ -484,11 +518,12 @@ const Index = () => {
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="p-2 hover:bg-muted rounded-md transition-colors"
-                  title="View us on TripAdvisor"
+                  title={t('common.tripAdvisorTitle')}
                 >
                   <ExternalLink className="w-5 h-5 text-muted-foreground hover:text-primary" />
                 </a>
               </div>
+              <LanguageSwitcher size="sm" className="hidden sm:flex" />
               
               {!loading && (
                 <>
@@ -498,7 +533,9 @@ const Index = () => {
                         <User className="w-4 h-4" />
                         <span className="hidden md:inline">{user.email}</span>
                         {typeof loyaltyPoints === 'number' && (
-                          <Badge variant="secondary" className="ml-2 text-xs">{loyaltyPoints} pts</Badge>
+                          <Badge variant="secondary" className="ml-2 text-xs">
+                            {t('common.pointsBadge', { points: loyaltyPoints })}
+                          </Badge>
                         )}
                       </div>
                       <Button
@@ -507,27 +544,28 @@ const Index = () => {
                         className="text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2 rounded-full border-2 hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-300"
                         size="sm"
                       >
-                        Reservations
+                        {t('common.reservations')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => signOut()}
+                        className="px-2 sm:px-3 py-1 sm:py-2 rounded-full border-2 hover:bg-accent hover:text-accent-foreground transition-all duration-300"
+                        title={t('common.signOut')}
+                        aria-label={t('common.signOut')}
+                      >
+                        <LogOut className="w-4 h-4" />
                       </Button>
                     </div>
                   ) : (
                     <Link to="/auth">
                       <Button variant="outline" size="sm" className="rounded-full px-3 sm:px-6 py-1 sm:py-2 border-2 hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-300 text-xs sm:text-sm">
-                        Sign In
+                        {t('common.signIn')}
                       </Button>
                     </Link>
                   )}
                 </>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => signOut()}
-                className="px-2 sm:px-3 py-1 sm:py-2 rounded-full border-2 hover:bg-accent hover:text-accent-foreground transition-all duration-300"
-                title="Sign Out"
-              >
-                <LogOut className="w-4 h-4" />
-              </Button>
             </div>
           </div>
         </div>
@@ -536,8 +574,8 @@ const Index = () => {
       <Dialog open={followOpen} onOpenChange={setFollowOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>My Reservations</DialogTitle>
-            <DialogDescription>Live updates for your device and account.</DialogDescription>
+            <DialogTitle>{t('common.myReservationsTitle')}</DialogTitle>
+            <DialogDescription>{t('common.myReservationsDescription')}</DialogDescription>
           </DialogHeader>
           <ReservationsPanel userId={user?.id ?? null} />
         </DialogContent>
@@ -570,7 +608,7 @@ const Index = () => {
 
         {filteredItems.length === 0 && (
           <div className="text-center py-8 sm:py-12">
-            <p className="text-muted-foreground text-sm sm:text-base">No items found in this category.</p>
+            <p className="text-muted-foreground text-sm sm:text-base">{t('common.noItems')}</p>
           </div>
         )}
       </main>
@@ -582,10 +620,10 @@ const Index = () => {
         items={cartItems}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
-      onCheckout={handleCheckout}
+        onCheckout={handleCheckout}
         isOpen={isCartOpen}
         onToggle={() => setIsCartOpen(!isCartOpen)}
-      isLoggedIn={!!user}
+        isLoggedIn={!!user}
         canProceed={true}
       />
 
@@ -596,10 +634,10 @@ const Index = () => {
             variant="outline" 
             size="sm"
             className="bg-background/90 backdrop-blur-sm border-2 hover:bg-accent hover:text-accent-foreground transition-all duration-300 rounded-full px-3 py-2"
-            title="Admin Login"
+            title={t('common.adminLoginTitle')}
           >
             <Shield className="w-4 h-4" />
-            <span className="ml-1 text-xs hidden sm:inline">Admin</span>
+            <span className="ml-1 text-xs hidden sm:inline">{t('common.admin')}</span>
           </Button>
         </Link>
       </div>

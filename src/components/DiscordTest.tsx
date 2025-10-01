@@ -12,6 +12,20 @@ export const DiscordTest = () => {
     setTesting(true);
     
     try {
+      // Debug: Check if webhook URL is loaded
+      const webhookUrl = import.meta.env.VITE_DISCORD_WEBHOOK;
+      console.log('Discord Webhook URL:', webhookUrl ? 'Loaded ✅' : 'Missing ❌');
+      console.log('Full URL:', webhookUrl);
+      
+      if (!webhookUrl) {
+        toast({
+          title: "Discord Webhook Not Found ❌",
+          description: "The VITE_DISCORD_WEBHOOK environment variable is not set. Please restart the development server.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const testMessage = `🧪 **Test Order Notification - Dar Lmeknessiya**
 
 📍 **Type:** Dine-in  
@@ -41,15 +55,35 @@ Subtotal: 85.00 MAD
       } else {
         toast({
           title: "Discord Test Failed ❌",
-          description: "Please check your webhook URL in the .env file.",
+          description: "The webhook request failed. Check the console for error details.",
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Discord test error:', error);
+      
+      let errorTitle = "Discord Test Error ❌";
+      let errorDescription = "";
+      
+      if (error.code === 'ERR_BLOCKED_BY_CLIENT') {
+        errorTitle = "Request Blocked by Browser ❌";
+        errorDescription = "Your ad blocker or browser is blocking the request. Try: 1) Disable ad blocker temporarily, 2) Use incognito mode, 3) Try a different browser";
+      } else if (error.code === 'ERR_NETWORK') {
+        errorTitle = "Network Error ❌";
+        errorDescription = "Network connection issue. Try: 1) Check internet connection, 2) Disable VPN, 3) Check firewall settings";
+      } else if (error.response?.status === 404) {
+        errorTitle = "Discord Webhook Not Found ❌";
+        errorDescription = "The webhook URL is invalid or the webhook was deleted. Please create a new webhook.";
+      } else if (error.response?.status === 401) {
+        errorTitle = "Discord Webhook Unauthorized ❌";
+        errorDescription = "The webhook token is invalid. Please create a new webhook.";
+      } else {
+        errorDescription = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+      
       toast({
-        title: "Discord Test Error ❌",
-        description: "Something went wrong. Check the console for details.",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {

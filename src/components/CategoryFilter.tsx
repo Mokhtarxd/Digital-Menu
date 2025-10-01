@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { useTranslation } from 'react-i18next';
 
 interface CategoryFilterProps {
   categories: string[];
@@ -12,6 +13,7 @@ export const CategoryFilter = ({
   selectedCategory, 
   onCategoryChange 
 }: CategoryFilterProps) => {
+  const { t } = useTranslation();
   return (
     <div className="sticky top-0 z-40 px-3 sm:px-4 py-2 sm:py-3">
       <ScrollArea className="w-full whitespace-nowrap">
@@ -24,7 +26,7 @@ export const CategoryFilter = ({
               : 'rounded-full px-4 sm:px-6 py-2 border-2 hover:bg-gray-100 hover:text-gray-700 font-medium transition-all duration-300 text-xs sm:text-sm'
             }
           >
-            All Items
+            {t('categoryFilter.all')}
           </Button>
           
           {categories.map((category) => (
