@@ -12,23 +12,24 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Pencil, Plus, Trash2, Image, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
-interface Dish {
-  id: string;
+type Dish = Database['public']['Tables']['dishes']['Row'];
+type DishInsert = Database['public']['Tables']['dishes']['Insert'];
+type DishUpdate = Database['public']['Tables']['dishes']['Update'];
+
+type FormState = {
   name: string;
-  description: string | null;
+  description: string;
   price: number;
-  category: string | null;
-  image_url: string | null;
+  category: string;
+  image_url: string;
   is_available: boolean;
   is_hidden: boolean;
   loyalty_points: number | null;
-  order_notification: string | null;
   wait_time: number | null;
   currency: string;
-  created_at: string;
-  updated_at: string;
-}
+};
 
 export const MenuManagement = () => {
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -37,7 +38,7 @@ export const MenuManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDish, setEditingDish] = useState<Dish | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'unavailable'>('all');
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormState>({
     name: '',
     description: '',
     price: 0,
@@ -45,9 +46,9 @@ export const MenuManagement = () => {
     image_url: '',
     is_available: true,
     is_hidden: false,
-    loyalty_points: null as number | null,
-    wait_time: null as number | null,
-    currency: 'MAD'
+    loyalty_points: null,
+    wait_time: null,
+    currency: 'MAD',
   });
   const { toast } = useToast();
 
@@ -64,6 +65,8 @@ export const MenuManagement = () => {
     'Vegetarian',
     'Specials'
   ];
+
+  const outOfStockCount = dishes.filter(d => !d.is_available).length;
 
   const fetchDishes = async () => {
     try {
@@ -83,7 +86,7 @@ export const MenuManagement = () => {
         return;
       }
 
-      setDishes(data || []);
+  setDishes((data || []) as Dish[]);
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -121,22 +124,25 @@ export const MenuManagement = () => {
         });
         return;
       }
+    const isAvailable = editingDish ? formData.is_available : false;
       
       if (editingDish) {
         // Update existing dish
-        const { error } = await supabase
-          .from('dishes')
-          .update({
-            name: formData.name,
-            description: formData.description || null,
-            price: formData.price,
-            category: formData.category || null,
-            image_url: formData.image_url || null,
-            is_available: formData.is_available,
-            loyalty_points: formData.loyalty_points,
-            wait_time: formData.wait_time,
-            currency: formData.currency
-          })
+        const updatePayload: DishUpdate = {
+          name: formData.name,
+          description: formData.description || null,
+          price: formData.price,
+          category: formData.category || null,
+          image_url: formData.image_url || null,
+          is_available: isAvailable,
+          loyalty_points: formData.loyalty_points,
+          wait_time: formData.wait_time,
+          currency: formData.currency,
+        };
+
+        const { error } = await (supabase
+          .from('dishes') as any)
+          .update(updatePayload)
           .eq('id', editingDish.id);
 
         if (error) {
@@ -150,19 +156,22 @@ export const MenuManagement = () => {
         });
       } else {
         // Create new dish
-        const { data, error } = await supabase
-          .from('dishes')
-          .insert({
-            name: formData.name,
-            description: formData.description || null,
-            price: formData.price,
-            category: formData.category || null,
-            image_url: formData.image_url || null,
-            is_available: formData.is_available,
-            loyalty_points: formData.loyalty_points,
-            wait_time: formData.wait_time,
-            currency: formData.currency
-          })
+        const insertPayload: DishInsert = {
+          name: formData.name,
+          description: formData.description || null,
+          price: formData.price,
+          category: formData.category || null,
+          image_url: formData.image_url || null,
+          is_available: false,
+          loyalty_points: formData.loyalty_points,
+          wait_time: formData.wait_time,
+          currency: formData.currency,
+          stock: 0,
+        };
+
+        const { data, error } = await (supabase
+          .from('dishes') as any)
+          .insert(insertPayload)
           .select();
 
         if (error) {
@@ -188,7 +197,7 @@ export const MenuManagement = () => {
         is_hidden: false,
         loyalty_points: null,
         wait_time: null,
-        currency: 'MAD'
+        currency: 'MAD',
       });
       await fetchDishes();
     } catch (error: any) {
@@ -215,7 +224,7 @@ export const MenuManagement = () => {
       is_hidden: dish.is_hidden,
       loyalty_points: dish.loyalty_points,
       wait_time: dish.wait_time,
-      currency: dish.currency
+      currency: dish.currency,
     });
     setIsDialogOpen(true);
   };
@@ -224,8 +233,8 @@ export const MenuManagement = () => {
     if (!confirm('Are you sure you want to delete this menu item?')) return;
 
     try {
-      const { error } = await supabase
-        .from('dishes')
+      const { error } = await (supabase
+        .from('dishes') as any)
         .delete()
         .eq('id', dishId);
 
@@ -249,8 +258,8 @@ export const MenuManagement = () => {
 
   const toggleAvailability = async (dishId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('dishes')
+      const { error } = await (supabase
+        .from('dishes') as any)
         .update({ is_available: !currentStatus })
         .eq('id', dishId);
 
@@ -274,9 +283,9 @@ export const MenuManagement = () => {
 
   const toggleHidden = async (dishId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('dishes')
-        .update({ is_hidden: !currentStatus } as any)
+      const { error } = await (supabase
+        .from('dishes') as any)
+        .update({ is_hidden: !currentStatus })
         .eq('id', dishId);
 
       if (error) throw error;
@@ -313,7 +322,7 @@ export const MenuManagement = () => {
       <CardHeader>
         <CardTitle>Menu Management</CardTitle>
         <CardDescription>
-          Add, edit, and manage menu items • {dishes.length} total items • {dishes.filter(d => !d.is_available).length} out of stock
+          Add, edit, and manage menu items • {dishes.length} total items • {outOfStockCount} out of stock
         </CardDescription>
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -343,7 +352,7 @@ export const MenuManagement = () => {
                   is_hidden: false,
                   loyalty_points: null,
                   wait_time: null,
-                  currency: 'MAD'
+                  currency: 'MAD',
                 });
               }}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -505,98 +514,98 @@ export const MenuManagement = () => {
                   return true; // 'all'
                 })
                 .map((dish) => (
-                <TableRow key={dish.id}>
-                  <TableCell>
-                    {dish.image_url ? (
-                      <img 
-                        src={dish.image_url} 
-                        alt={dish.name}
-                        className="w-12 h-12 object-cover rounded"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/placeholder.svg';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
-                        <Image className="h-6 w-6 text-gray-400" />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{dish.name}</div>
-                      {dish.description && (
-                        <div className="text-sm text-muted-foreground truncate max-w-xs">
-                          {dish.description}
+                  <TableRow key={dish.id}>
+                    <TableCell>
+                      {dish.image_url ? (
+                        <img
+                          src={dish.image_url}
+                          alt={dish.name}
+                          className="w-12 h-12 object-cover rounded"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/placeholder.svg';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                          <Image className="h-6 w-6 text-gray-400" />
                         </div>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{dish.category || '—'}</TableCell>
-                  <TableCell>{dish.currency} {dish.price.toFixed(2)}</TableCell>
-                  <TableCell>
-                    {dish.loyalty_points !== null ? (
-                      <Badge variant="outline" className="text-xs">
-                        {dish.loyalty_points} pts
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{dish.name}</div>
+                        {dish.description && (
+                          <div className="text-sm text-muted-foreground truncate max-w-xs">
+                            {dish.description}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{dish.category || '—'}</TableCell>
+                    <TableCell>{dish.currency} {dish.price.toFixed(2)}</TableCell>
+                    <TableCell>
+                      {dish.loyalty_points !== null ? (
+                        <Badge variant="outline" className="text-xs">
+                          {dish.loyalty_points} pts
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Default</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {dish.wait_time !== null ? (
+                        <Badge variant="secondary" className="text-xs">
+                          {dish.wait_time} min
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Default</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={dish.is_available ? 'default' : 'destructive'} className="text-xs">
+                        {dish.is_available ? '✓ Available' : '✗ Out of Stock'}
                       </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Default</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {dish.wait_time !== null ? (
-                      <Badge variant="secondary" className="text-xs">
-                        {dish.wait_time} min
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Default</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={dish.is_available ? 'default' : 'destructive'} className="text-xs">
-                      {dish.is_available ? '✓ Available' : '✗ Out of Stock'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant={dish.is_available ? 'destructive' : 'default'}
-                        size="sm"
-                        onClick={() => toggleAvailability(dish.id, dish.is_available)}
-                        className="min-w-[80px]"
-                      >
-                        {dish.is_available ? 'Mark Out' : 'Mark In'}
-                      </Button>
-                      <Button
-                        variant={dish.is_hidden ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => toggleHidden(dish.id, dish.is_hidden)}
-                        className={`min-w-[70px] ${
-                          dish.is_hidden 
-                            ? 'bg-green-600 hover:bg-green-700 text-white' 
-                            : 'text-orange-600 border-orange-300 hover:bg-orange-50'
-                        }`}
-                      >
-                        {dish.is_hidden ? 'Show' : 'Hide'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(dish)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(dish.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant={dish.is_available ? 'destructive' : 'default'}
+                          size="sm"
+                          onClick={() => toggleAvailability(dish.id, dish.is_available)}
+                          className="min-w-[80px]"
+                        >
+                          {dish.is_available ? 'Mark Out' : 'Mark In'}
+                        </Button>
+                        <Button
+                          variant={dish.is_hidden ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => toggleHidden(dish.id, dish.is_hidden)}
+                          className={`min-w-[70px] ${
+                            dish.is_hidden
+                              ? 'bg-green-600 hover:bg-green-700 text-white'
+                              : 'text-orange-600 border-orange-300 hover:bg-orange-50'
+                          }`}
+                        >
+                          {dish.is_hidden ? 'Show' : 'Hide'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(dish)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(dish.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
           {dishes.length === 0 && (

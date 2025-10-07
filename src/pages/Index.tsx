@@ -17,8 +17,10 @@ import { ReservationsPanel } from '@/components/ReservationsPanel';
 import { supabase, CLIENT_ID } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { sendOrderNotification } from '@/lib/whatsapp';
+import { adjustInventory } from '@/lib/inventory';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { OpeningHours } from '@/components/OpeningHours';
 
 // No static sample menu — the UI uses Supabase `dishes` rows directly.
 
@@ -46,18 +48,25 @@ const Index = () => {
           setRemoteMenuItems([]);
           return;
         }
-  const mapped: MenuItem[] = (data || []).map((r: Database['public']['Tables']['dishes']['Row']) => ({
-          id: r.id,
-          name: r.name,
-          description: r.description || '',
-          price: Number(r.price) || 0,
-          category: r.category || 'Uncategorized',
-          image: r.image_url || '/placeholder.svg',
-          available: Boolean(r.is_available),
-          is_hidden: Boolean(r.is_hidden),
-          loyalty_points: r.loyalty_points,
-          wait_time: r.wait_time,
-        }));
+
+        const mapped: MenuItem[] = (data || []).map((r: Database['public']['Tables']['dishes']['Row']) => {
+          const rawStock = (r as unknown as { stock?: number | null }).stock;
+          const stock = typeof rawStock === 'number' ? Number(rawStock) : null;
+
+          return {
+            id: r.id,
+            name: r.name,
+            description: r.description || '',
+            price: Number(r.price) || 0,
+            category: r.category || 'Uncategorized',
+            image: r.image_url || '/placeholder.svg',
+            available: Boolean(r.is_available && (stock === null || stock > 0)),
+            is_hidden: Boolean(r.is_hidden),
+            loyalty_points: r.loyalty_points,
+            wait_time: r.wait_time,
+            stock,
+          };
+        });
         setRemoteMenuItems(mapped);
       } finally {
         if (mounted) setLoadingMenu(false);
@@ -99,12 +108,44 @@ const Index = () => {
     ? sourceItems
     : sourceItems.filter(item => item.category === selectedCategory);
 
+  const stockIssues = useMemo(() =>
+    cartItems.filter(item => typeof item.stock === 'number' && item.quantity > (item.stock ?? 0)),
+  [cartItems]);
+  const cartCanProceed = stockIssues.length === 0;
+
+  useEffect(() => {
+    if (!remoteMenuItems) return;
+
+    setCartItems(prevItems =>
+      prevItems.map(cartItem => {
+        const latest = remoteMenuItems.find(item => item.id === cartItem.id);
+        if (!latest) {
+          return cartItem;
+        }
+        return { ...cartItem, ...latest, quantity: cartItem.quantity };
+      })
+    );
+  }, [remoteMenuItems]);
+
   const handleTableSelected = (tableNumber: string | null, orderType: 'dine-in' | 'takeout') => {
     setTableInfo({ tableNumber, orderType });
     setShowTableSelection(false);
   };
 
   const handleAddToCart = (item: MenuItem, quantityChange: number) => {
+    const existingCartItem = cartItems.find(cartItem => cartItem.id === item.id);
+    const currentQuantity = existingCartItem?.quantity ?? 0;
+    const stockLimit = typeof item.stock === 'number' ? item.stock : null;
+
+    if (quantityChange > 0 && stockLimit !== null && currentQuantity + quantityChange > stockLimit) {
+      toast({
+        title: t('toasts.stockLimitTitle'),
+        description: t('toasts.stockLimitDescription', { item: item.name, stock: stockLimit }),
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setCartItems(prevItems => {
       const existingItem = prevItems.find(cartItem => cartItem.id === item.id);
       
@@ -117,7 +158,7 @@ const Index = () => {
         
         return prevItems.map(cartItem =>
           cartItem.id === item.id
-            ? { ...cartItem, quantity: newQuantity }
+            ? { ...cartItem, ...item, quantity: newQuantity }
             : cartItem
         );
       } else if (quantityChange > 0) {
@@ -138,6 +179,18 @@ const Index = () => {
   const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
       handleRemoveItem(itemId);
+      return;
+    }
+
+    const latestMenuItem = sourceItems.find(item => item.id === itemId) || cartItems.find(item => item.id === itemId);
+    const stockLimit = latestMenuItem && typeof latestMenuItem.stock === 'number' ? latestMenuItem.stock : null;
+
+    if (stockLimit !== null && newQuantity > stockLimit) {
+      toast({
+        title: t('toasts.stockLimitTitle'),
+        description: t('toasts.stockLimitDescription', { item: latestMenuItem?.name ?? '', stock: stockLimit }),
+        variant: 'destructive',
+      });
       return;
     }
     
@@ -238,6 +291,41 @@ const Index = () => {
       const reservationId = (inserted as { id: string | null } | null)?.id;
       if (!reservationId) {
         throw new Error('Reservation insert failed');
+      }
+
+      let updatedInventory: Awaited<ReturnType<typeof adjustInventory>> = [];
+      try {
+        updatedInventory = await adjustInventory(
+          cartItems.map(item => ({ id: item.id, delta: -item.quantity }))
+        );
+
+        if (updatedInventory.length) {
+          setRemoteMenuItems(prev => {
+            if (!prev) return prev;
+            return prev.map(menuItem => {
+              const update = updatedInventory.find(entry => entry.dish_id === menuItem.id);
+              if (!update) return menuItem;
+              return {
+                ...menuItem,
+                stock: update.stock,
+                available: update.is_available,
+              };
+            });
+          });
+
+          const newlyOut = updatedInventory.find(entry => entry.stock === 0);
+          if (newlyOut) {
+            const itemInfo = cartItems.find(item => item.id === newlyOut.dish_id);
+            if (itemInfo) {
+              toast({
+                title: t('toasts.stockDepletedTitle'),
+                description: t('toasts.stockDepletedDescription', { item: itemInfo.name }),
+              });
+            }
+          }
+        }
+      } catch (inventoryError) {
+        console.error('Failed to adjust inventory', inventoryError);
       }
 
       // No longer generating QR code - removed popup functionality
@@ -405,6 +493,7 @@ const Index = () => {
                   <h1 className="text-base font-bold text-black leading-tight">
                     Dar Lmeknessiya
                   </h1>
+                  <OpeningHours variant="mobile" className="mt-0.5" />
                 </div>
               </div>
               
@@ -492,12 +581,7 @@ const Index = () => {
                 <h1 className="text-lg sm:text-2xl font-bold text-black">
                   Dar Lmeknessiya
                 </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {tableInfo?.orderType === 'dine-in' && tableInfo?.tableNumber
-                    ? t('common.dineInStatus', { table: tableInfo.tableNumber })
-                    : t('common.takeoutOrder')
-                  }
-                </p>
+                <OpeningHours className="mt-1" />
               </div>
             </div>
 
@@ -624,7 +708,7 @@ const Index = () => {
         isOpen={isCartOpen}
         onToggle={() => setIsCartOpen(!isCartOpen)}
         isLoggedIn={!!user}
-        canProceed={true}
+        canProceed={cartCanProceed}
       />
 
       {/* Admin Login Button */}

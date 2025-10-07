@@ -45,8 +45,8 @@ export const OverviewDashboard = () => {
           .select('status')
           .gte('created_at', new Date().toISOString().split('T')[0]),
         
-        // Menu items stats
-        supabase.from('dishes').select('is_available'),
+    // Menu items stats
+    supabase.from('dishes').select('is_available'),
         
         // Users stats
         supabase.from('profiles').select('user_type')
@@ -106,6 +106,14 @@ export const OverviewDashboard = () => {
     );
   }
 
+  const tableOccupancy = stats.totalTables
+    ? Math.round(((stats.totalTables - stats.availableTables) / stats.totalTables) * 100)
+    : 0;
+
+  const menuAvailability = stats.totalMenuItems
+    ? Math.round((stats.availableMenuItems / stats.totalMenuItems) * 100)
+    : 0;
+
   const statCards = [
     {
       title: 'Total Tables',
@@ -151,14 +159,14 @@ export const OverviewDashboard = () => {
     },
     {
       title: 'Table Occupancy',
-      value: Math.round(((stats.totalTables - stats.availableTables) / stats.totalTables) * 100),
+      value: tableOccupancy,
       subtitle: '% occupied',
       icon: TrendingUp,
       color: 'text-yellow-600'
     },
     {
       title: 'Menu Availability',
-      value: Math.round((stats.availableMenuItems / stats.totalMenuItems) * 100),
+      value: menuAvailability,
       subtitle: '% available items',
       icon: TrendingUp,
       color: 'text-green-600'

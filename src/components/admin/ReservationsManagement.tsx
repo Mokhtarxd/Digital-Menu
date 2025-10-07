@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { adjustInventory } from '@/lib/inventory';
 
 interface Reservation {
   id: string;
@@ -91,13 +92,35 @@ export const ReservationsManagement = () => {
   }, [selectedStatus]);
 
   const handleStatusChange = async (reservationId: string, newStatus: string) => {
+    const reservation = reservations.find(r => r.id === reservationId);
+    const previousStatus = reservation?.status;
     try {
-      const { error } = await supabase
-        .from('reservations')
+      const { error } = await (supabase
+        .from('reservations') as any)
         .update({ status: newStatus })
         .eq('id', reservationId);
 
       if (error) throw error;
+
+      if (reservation) {
+        const notes = parseNotes(reservation.notes);
+        const adjustments = Array.isArray(notes?.items)
+          ? notes.items
+              .filter((item: any) => item?.id)
+              .map((item: any) => ({
+                id: String(item.id),
+                delta: Math.max(1, Math.floor(Number(item.qty) || 1)),
+              }))
+          : [];
+
+        if (adjustments.length && previousStatus !== 'cancelled' && newStatus === 'cancelled') {
+          try {
+            await adjustInventory(adjustments);
+          } catch (inventoryError) {
+            console.error('Inventory restock failed (admin panel)', inventoryError);
+          }
+        }
+      }
 
       toast({
         title: 'Success',

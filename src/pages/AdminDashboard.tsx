@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogOut, BarChart3, Users, Utensils, Calendar, Table, Bell } from 'lucide-react';
+import { LogOut, BarChart3, Users, Utensils, Calendar, Table, Bell, Boxes } from 'lucide-react';
 import { TablesManagement } from '@/components/admin/TablesManagement';
 import { ReservationsManagement } from '@/components/admin/ReservationsManagement';
 import { MenuManagement } from '@/components/admin/MenuManagement';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { OverviewDashboard } from '@/components/admin/OverviewDashboard';
 import { DiscordTest } from '@/components/DiscordTest';
+import { InventoryManagement } from '@/components/admin/InventoryManagement';
 
 const AdminDashboard = () => {
   const { user, signOut } = useAdminAuth();
@@ -43,7 +44,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <main className="p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Overview
@@ -55,6 +56,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="menu" className="flex items-center gap-2">
               <Utensils className="h-4 w-4" />
               Menu
+            </TabsTrigger>
+            <TabsTrigger value="quantity" className="flex items-center gap-2">
+              <Boxes className="h-4 w-4" />
+              Quantity
             </TabsTrigger>
             <TabsTrigger value="tables" className="flex items-center gap-2">
               <Table className="h-4 w-4" />
@@ -80,6 +85,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="menu">
             <MenuManagement />
+          </TabsContent>
+
+          <TabsContent value="quantity">
+            <InventoryManagement />
           </TabsContent>
 
           <TabsContent value="tables">

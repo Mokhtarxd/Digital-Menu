@@ -9,6 +9,7 @@ import { MenuItem } from './MenuCard';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoyaltyRedemption } from './LoyaltyRedemption';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export interface CartItem extends MenuItem {
   quantity: number;
@@ -116,6 +117,17 @@ export const ShoppingCart = ({
                       <p className="text-xs sm:text-sm text-muted-foreground">
                         {t('cart.each', { price: item.price.toFixed(2) })}
                       </p>
+                      {typeof item.stock === 'number' && (
+                        <p
+                          className={`text-[10px] sm:text-xs ${
+                            item.quantity > item.stock ? 'text-destructive' : 'text-muted-foreground'
+                          }`}
+                        >
+                          {t('cart.stockStatus', {
+                            remaining: Math.max(item.stock - item.quantity, 0),
+                          })}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="flex items-center gap-1 sm:gap-2">
@@ -136,7 +148,8 @@ export const ShoppingCart = ({
                         variant="outline"
                         size="sm"
                         onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                        className="h-6 w-6 sm:h-8 sm:w-8 p-0"
+                        disabled={typeof item.stock === 'number' && item.quantity >= item.stock}
+                        className="h-6 w-6 sm:h-8 sm:w-8 p-0 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <Plus className="h-2 w-2 sm:h-3 sm:w-3" />
                       </Button>
@@ -172,6 +185,14 @@ export const ShoppingCart = ({
                       {finalTotal.toFixed(2)} MAD
                     </span>
                   </div>
+
+                  {!canProceed && (
+                    <Alert variant="destructive">
+                      <AlertDescription className="text-xs sm:text-sm">
+                        {t('cart.stockWarning')}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   
                   {/* Loyalty Points Redemption */}
                   <LoyaltyRedemption

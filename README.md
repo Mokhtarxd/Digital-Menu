@@ -60,6 +60,32 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Integrations
+
+- [Google Sheets Export](docs/google-sheets-export.md) — append every order or cancellation to a Google Sheet via a free Google Apps Script web app.
+
+## Customization
+
+### Opening hours banner
+
+The text shown under the restaurant name is sourced from the `VITE_OPENING_HOURS` environment variable.
+
+- Provide a simple string to display a single line (e.g. `Monday – Sunday · 12:00 – 23:00`).
+- Separate multiple lines with `|` (e.g. `Lunch 12:00 – 15:30|Dinner 19:00 – 23:30`).
+- For multilingual hours, pass JSON, for example:
+
+	```json
+	{
+		"en": ["Monday – Sunday · 12:00 – 23:00"],
+		"fr": ["Lundi – Dimanche · 12h00 – 23h00"],
+		"ar": ["يوميًا · 12:00 – 23:00"]
+	}
+	```
+
+Restart the dev server after changing the variable so Vite can pick up the new value.
+
+Refer to [docs/opening-hours.md](docs/opening-hours.md) for advanced formatting tips.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/58978195-5c30-48e6-8d4c-38657b9a8039) and click on Share -> Publish.

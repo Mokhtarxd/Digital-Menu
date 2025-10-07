@@ -7,6 +7,7 @@ import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { useToast } from '../hooks/use-toast';
 import { sendCancellationNotification } from '../lib/whatsapp';
+import { adjustInventory } from '@/lib/inventory';
 
 type Reservation = Database['public']['Tables']['reservations']['Row'];
 type TableRow = Database['public']['Tables']['tables']['Row'];
@@ -142,7 +143,7 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
                             .from('reservations')
                             .update({ status: 'cancelled' })
                             .eq('id', r.id)
-                            .select('id')
+                            .select('id, notes')
                             .maybeSingle();
                           if (error) throw error;
                           if (!updated) {
@@ -179,6 +180,24 @@ export function ReservationsPanel({ userId }: { userId?: string | null }) {
                             } catch (e) {
                               console.error('Failed to send cancellation notification:', e);
                               // Don't block the cancellation process if WhatsApp fails
+                            }
+
+                            try {
+                              const notes = parseNotes((updated as any)?.notes ?? r.notes);
+                              const adjustments = Array.isArray(notes?.items)
+                                ? notes.items
+                                    .filter((item: any) => item?.id)
+                                    .map((item: any) => ({
+                                      id: String(item.id),
+                                      delta: Math.max(1, Math.floor(Number(item.qty) || 1)),
+                                    }))
+                                : [];
+
+                              if (adjustments.length) {
+                                await adjustInventory(adjustments);
+                              }
+                            } catch (inventoryError) {
+                              console.error('Inventory restock failed', inventoryError);
                             }
                           }
                         } catch (e) {

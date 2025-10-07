@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { exportOrderToGoogleSheets } from './googleSheets';
 
 interface NotificationData {
   orderType: string;
@@ -122,6 +123,7 @@ export async function sendEmailNotification(message: string, isNewOrder: boolean
 export async function sendMultiChannelNotification(data: NotificationData, isNewOrder: boolean = true): Promise<void> {
   const emoji = isNewOrder ? '🍽️' : '❌';
   const title = isNewOrder ? 'NEW ORDER RECEIVED' : 'ORDER CANCELLED';
+  const timestamp = new Date();
   
   let message = `${emoji} *${title}*\n\n`;
   message += `📍 *Type:* ${data.orderType === 'dine-in' ? 'Dine-in' : 'Takeout'}\n`;
@@ -159,13 +161,18 @@ export async function sendMultiChannelNotification(data: NotificationData, isNew
     message += `\n🆔 Order ID: ${data.reservationId.substring(0, 8)}\n`;
   }
   
-  message += `\n⏰ ${new Date().toLocaleString('en-GB', { timeZone: 'Africa/Casablanca' })}`;
+  message += `\n⏰ ${timestamp.toLocaleString('en-GB', { timeZone: 'Africa/Casablanca' })}`;
 
   // Try all configured notification methods
   const notifications = [
     sendTelegramNotification(message, isNewOrder),
     sendDiscordNotification(message, isNewOrder),
-    sendEmailNotification(message, isNewOrder)
+    sendEmailNotification(message, isNewOrder),
+    exportOrderToGoogleSheets({
+      ...data,
+      status: isNewOrder ? 'received' : 'cancelled',
+      createdAt: timestamp.toISOString(),
+    })
   ];
 
   // Wait for all notifications to complete (don't block on failures)

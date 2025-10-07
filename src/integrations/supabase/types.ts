@@ -21,6 +21,7 @@ export interface Database {
           is_hidden: boolean
           loyalty_points: number | null
           wait_time: number | null
+          stock: number | null
           currency: string
           created_at: string
           updated_at: string
@@ -36,6 +37,7 @@ export interface Database {
           is_hidden?: boolean
           loyalty_points?: number | null
           wait_time?: number | null
+          stock?: number | null
           currency?: string
           created_at?: string
           updated_at?: string
@@ -51,6 +53,7 @@ export interface Database {
           is_hidden?: boolean
           loyalty_points?: number | null
           wait_time?: number | null
+          stock?: number | null
           currency?: string
           created_at?: string
           updated_at?: string
@@ -142,7 +145,16 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      adjust_inventory: {
+        Args: {
+          _items: Json
+        }
+        Returns: {
+          dish_id: string
+          stock: number | null
+          is_available: boolean
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

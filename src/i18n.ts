@@ -48,6 +48,7 @@ const resources: Resources = {
         myReservationsDescription: 'Live updates for your device and account.',
         noItems: 'No items found in this category.',
         pointsBadge: '{{points}} pts',
+        openingHoursLabel: 'Opening hours',
       },
       menuCard: {
         available: 'Available',
@@ -185,6 +186,7 @@ const resources: Resources = {
         myReservationsDescription: 'Suivi en direct pour votre appareil et votre compte.',
         noItems: 'Aucun élément trouvé dans cette catégorie.',
         pointsBadge: '{{points}} pts',
+        openingHoursLabel: "Horaires d'ouverture",
       },
       menuCard: {
         available: 'Disponible',
@@ -322,6 +324,7 @@ const resources: Resources = {
         myReservationsDescription: 'Actualizaciones en vivo para tu dispositivo y cuenta.',
         noItems: 'No se encontraron artículos en esta categoría.',
         pointsBadge: '{{points}} pts',
+        openingHoursLabel: 'Horario de apertura',
       },
       menuCard: {
         available: 'Disponible',
@@ -459,6 +462,7 @@ const resources: Resources = {
         myReservationsDescription: 'تحديثات فورية لجهازك وحسابك.',
         noItems: 'لا توجد عناصر في هذه الفئة.',
         pointsBadge: '{{points}} نقطة',
+        openingHoursLabel: 'ساعات العمل',
       },
       menuCard: {
         available: 'متاح',

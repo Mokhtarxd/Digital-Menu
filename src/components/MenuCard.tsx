@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +16,7 @@ export interface MenuItem {
   is_hidden?: boolean;
   loyalty_points?: number | null;
   wait_time?: number | null;
+  stock?: number | null;
 }
 
 interface MenuCardProps {
@@ -34,7 +35,20 @@ export const MenuCard = ({ item, onAddToCart, cartQuantity = 0 }: MenuCardProps)
     return base ?? 0;
   }, [item.loyalty_points, item.price]);
 
+  useEffect(() => {
+    setQuantity(cartQuantity);
+  }, [cartQuantity]);
+
+  const maxStock = typeof item.stock === 'number' ? item.stock : undefined;
+  const remainingStock = typeof maxStock === 'number' ? Math.max(maxStock - quantity, 0) : undefined;
+  const isOutOfStock = !item.available || (typeof maxStock === 'number' && maxStock <= 0);
+  const isAtLimit = typeof maxStock === 'number' && quantity >= maxStock;
+
   const handleAddToCart = () => {
+    if (isAtLimit) {
+      return;
+    }
+
     const newQuantity = quantity + 1;
     setQuantity(newQuantity);
     onAddToCart(item, 1);
@@ -88,6 +102,15 @@ export const MenuCard = ({ item, onAddToCart, cartQuantity = 0 }: MenuCardProps)
                   {t('menuCard.fidelityPoints', { count: fidelityPoints })}
                 </span>
               )}
+              {typeof maxStock === 'number' && maxStock >= 0 && (
+                <span className="text-[10px] sm:text-xs text-muted-foreground">
+                  {isOutOfStock
+                    ? t('menuCard.stockOut')
+                    : remainingStock !== undefined && remainingStock <= 5
+                      ? t('menuCard.stockLow', { count: remainingStock })
+                      : t('menuCard.stockAvailable', { count: maxStock })}
+                </span>
+              )}
             </div>
             
             {item.available ? (
@@ -109,7 +132,8 @@ export const MenuCard = ({ item, onAddToCart, cartQuantity = 0 }: MenuCardProps)
                 <Button
                   onClick={handleAddToCart}
                   size="sm"
-                  className="h-6 sm:h-7 px-2 sm:px-3 text-xs rounded-full bg-gradient-primary hover:opacity-90 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+                  disabled={isAtLimit}
+                  className="h-6 sm:h-7 px-2 sm:px-3 text-xs rounded-full bg-gradient-primary hover:opacity-90 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Plus className="h-2 w-2 sm:h-3 sm:w-3" />
                   {quantity === 0 && <span className="ml-1 font-semibold hidden sm:inline">{t('menuCard.add')}</span>}
