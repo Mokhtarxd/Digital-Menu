@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, Users, Utensils, Calendar, TrendingUp, Clock } from 'lucide-react';
+import { OpeningHoursEditor } from '@/components/admin/OpeningHoursEditor';
 
 interface DashboardStats {
   totalTables: number;
@@ -198,44 +199,47 @@ export const OverviewDashboard = () => {
         })}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-sm text-muted-foreground">
-              • Check table status and manage reservations<br/>
-              • Update menu items and availability<br/>
-              • Monitor user activity and loyalty points<br/>
-              • View real-time restaurant statistics
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <OpeningHoursEditor className="lg:col-span-2" />
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="text-sm text-muted-foreground">
+                • Check table status and manage reservations<br/>
+                • Update menu items and availability<br/>
+                • Monitor user activity and loyalty points<br/>
+                • View real-time restaurant statistics
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>System Status</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Database Connection</span>
-              <span className="text-green-600">✓ Active</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Table Management</span>
-              <span className="text-green-600">✓ Operational</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Reservation System</span>
-              <span className="text-green-600">✓ Online</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>User Authentication</span>
-              <span className="text-green-600">✓ Secure</span>
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>System Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Database Connection</span>
+                <span className="text-green-600">✓ Active</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Table Management</span>
+                <span className="text-green-600">✓ Operational</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Reservation System</span>
+                <span className="text-green-600">✓ Online</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>User Authentication</span>
+                <span className="text-green-600">✓ Secure</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

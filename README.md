@@ -68,7 +68,7 @@ This project is built with:
 
 ### Opening hours banner
 
-The text shown under the restaurant name is sourced from the `VITE_OPENING_HOURS` environment variable.
+Edit the banner directly from the admin dashboard (**Overview → Opening hours**) or fall back to the `VITE_OPENING_HOURS` environment variable.
 
 - Provide a simple string to display a single line (e.g. `Monday – Sunday · 12:00 – 23:00`).
 - Separate multiple lines with `|` (e.g. `Lunch 12:00 – 15:30|Dinner 19:00 – 23:30`).
@@ -82,7 +82,7 @@ The text shown under the restaurant name is sourced from the `VITE_OPENING_HOURS
 	}
 	```
 
-Restart the dev server after changing the variable so Vite can pick up the new value.
+When using the env variable method, restart the dev server so Vite can pick up the new value.
 
 Refer to [docs/opening-hours.md](docs/opening-hours.md) for advanced formatting tips.
 

@@ -4,6 +4,14 @@ The line(s) shown beneath the "Dar Lmeknessiya" title are fully configurable wit
 
 ## Quick start
 
+### Option A — Admin dashboard (recommended)
+
+1. Sign in to the admin dashboard and open the **Overview** tab.
+2. Scroll to the **Opening hours** card.
+3. Update the text for each language and press **Save changes**. The public banner refreshes instantly.
+
+### Option B — Environment variable fallback
+
 1. Open your `.env` file.
 2. Set the `VITE_OPENING_HOURS` variable.
 3. Restart the Vite dev server so the new value is loaded.
@@ -25,10 +33,9 @@ The line(s) shown beneath the "Dar Lmeknessiya" title are fully configurable wit
 
 ## Previewing changes
 
-Because Vite only reads environment variables at startup, run:
+- Admin dashboard updates stream to the public site automatically; refresh the page if the browser tab was open beforehand.
+- When using the environment variable method, remember that Vite only reads variables at startup. Restart the dev server so the updated value is visible:
 
 ```powershell
 npm run dev
 ```
-
-again after editing `.env` so the updated value is visible in the browser.
